@@ -278,16 +278,38 @@ def filter_upcoming_events(events, days_ahead=30):
     return upcoming
 
 
+def has_sidewalk_closure(bridge_alerts):
+    """Check if any alert indicates sidewalks are fully closed (not just narrowed)."""
+    if not isinstance(bridge_alerts, list):
+        return False
+    for alert in bridge_alerts:
+        if not isinstance(alert, dict):
+            continue
+        text = (alert["title"] + " " + " ".join(alert["details"])).upper()
+        if "SIDEWALK" in text and "CLOSED" in text and "NARROWED" not in text:
+            return True
+    return False
+
+
 def format_slack_message(bridge_alerts, ggp_events, ggp_status, errors):
     """Format everything into a Slack message."""
     today_str = datetime.now().strftime("%A, %B %-d")
     blocks = []
+
+    sidewalk_closed = has_sidewalk_closure(bridge_alerts)
 
     # Header
     blocks.append({
         "type": "header",
         "text": {"type": "plain_text", "text": f"SF Road Closures — {today_str}"}
     })
+
+    # @channel ping if sidewalks are closed
+    if sidewalk_closed:
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": "<!channel> GG Bridge sidewalks closed today — bikes must take shuttle"}
+        })
 
     # GG Bridge section
     blocks.append({"type": "divider"})
