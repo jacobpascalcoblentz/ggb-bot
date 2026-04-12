@@ -24,6 +24,10 @@ HEADERS = {
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
+# NOAA station 9414806 = Sausalito
+TIDE_STATION = "9414806"
+TIDE_THRESHOLD_FT = 6.0
+
 
 def scrape_gg_bridge_alerts():
     """Scrape Golden Gate Bridge service alerts page for bridge-related closures.
@@ -278,6 +282,39 @@ def filter_upcoming_events(events, days_ahead=30):
     return upcoming
 
 
+def fetch_high_tides():
+    """Fetch today's high tides from NOAA for Sausalito.
+
+    Returns list of (time_str, height_ft) for highs >= TIDE_THRESHOLD_FT.
+    """
+    url = (
+        "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"
+        f"?date=today&station={TIDE_STATION}&product=predictions"
+        "&datum=MLLW&time_zone=lst_ldt&units=english&format=json&interval=hilo"
+    )
+    try:
+        resp = requests.get(url, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+    except (requests.RequestException, ValueError) as e:
+        print(f"Tide API error: {e}", file=sys.stderr)
+        return []
+
+    high_tides = []
+    for pred in data.get("predictions", []):
+        if pred["type"] == "H":
+            height = float(pred["v"])
+            if height >= TIDE_THRESHOLD_FT:
+                # Parse time like "2026-04-12 08:07"
+                try:
+                    t = datetime.strptime(pred["t"], "%Y-%m-%d %H:%M")
+                    time_str = t.strftime("%-I:%M%p").lower()
+                except ValueError:
+                    time_str = pred["t"]
+                high_tides.append((time_str, height))
+    return high_tides
+
+
 def get_sidewalk_closure_info(bridge_alerts):
     """If sidewalks are fully closed, return the time range. Otherwise None."""
     if not isinstance(bridge_alerts, list):
@@ -296,92 +333,46 @@ def get_sidewalk_closure_info(bridge_alerts):
     return None
 
 
-def format_slack_message(bridge_alerts, ggp_events, ggp_status, errors):
-    """Format everything into a Slack message."""
-    today_str = datetime.now().strftime("%A, %B %-d")
-    blocks = []
-
+def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, errors):
+    """Format Slack message. Returns None if nothing to report."""
     closure_time = get_sidewalk_closure_info(bridge_alerts)
 
-    # If sidewalks are closed, just post the urgent alert and tag channel
+    # Only post if there's something actionable
+    if not closure_time and not high_tides and not ggp_events:
+        return None
+
+    blocks = []
+
+    # Sidewalk closure — urgent
     if closure_time:
         blocks.append({
             "type": "section",
             "text": {"type": "mrkdwn", "text": f":rotating_light: <!channel> *GG Bridge sidewalks CLOSED {closure_time}* :rotating_light:\nBikes must take shuttle."}
         })
-        return {"blocks": blocks}
 
-    # Otherwise, normal daily summary
-    # Header
-    blocks.append({
-        "type": "header",
-        "text": {"type": "plain_text", "text": f"SF Road Closures — {today_str}"}
-    })
+    # High tides — Sausalito bike path flooding
+    if high_tides:
+        tide_parts = [f"{height:.1f}ft at {time}" for time, height in high_tides]
+        tide_text = ":ocean: *Sausalito bike path flood risk* — high tide " + ", ".join(tide_parts)
+        if any(h >= 7.0 for _, h in high_tides):
+            tide_text = f":ocean: <!channel> *King tide warning — Sausalito bike path likely flooded* — {', '.join(tide_parts)}"
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": tide_text}
+        })
 
-    # GG Bridge section
-    blocks.append({"type": "divider"})
-    bridge_text = "*Golden Gate Bridge*\n"
-    if isinstance(bridge_alerts, list) and bridge_alerts and isinstance(bridge_alerts[0], str):
-        # Error case
-        bridge_text += bridge_alerts[0]
-    elif bridge_alerts:
-        for alert in bridge_alerts:
-            title = alert["title"]
-            details = alert["details"]
-            href = alert["href"]
-            if href:
-                bridge_text += f"\n• *<{href}|{title}>*\n"
-            else:
-                bridge_text += f"\n• *{title}*\n"
-            for detail in details[:3]:
-                bridge_text += f"  {detail[:200]}\n"
-    else:
-        bridge_text += "No current bridge alerts affecting cyclists."
-
-    blocks.append({
-        "type": "section",
-        "text": {"type": "mrkdwn", "text": bridge_text[:3000]}
-    })
-
-    # GGP section
-    blocks.append({"type": "divider"})
-    ggp_text = "*Golden Gate Park*\n"
-
-    if ggp_status:
-        # Summarize key status
-        status_lines = ggp_status.split("\n")[:8]
-        ggp_text += "_Current status:_\n"
-        for line in status_lines:
-            ggp_text += f"  {line}\n"
-
+    # GGP upcoming closures
     if ggp_events:
-        ggp_text += "\n_Upcoming closures:_\n"
+        blocks.append({"type": "divider"})
+        ggp_text = "*Golden Gate Park — upcoming closures:*\n"
         for event in ggp_events[:5]:
             ggp_text += f"• *{event['title']}*\n"
-            for detail in event["details"][:3]:
+            for detail in event["details"][:2]:
                 ggp_text += f"  {detail[:120]}\n"
-    elif not ggp_status:
-        ggp_text += "No upcoming GGP closure info found."
-
-    blocks.append({
-        "type": "section",
-        "text": {"type": "mrkdwn", "text": ggp_text[:3000]}
-    })
-
-    # Footer
-    blocks.append({"type": "divider"})
-    source_text = (
-        "_Sources: "
-        "<https://www.goldengate.org/service-alerts/|GG Bridge Alerts> · "
-        "<https://sfrecpark.org/547/Golden-Gate-Park-Road-Closures|GGP Closures>_"
-    )
-    if errors:
-        source_text += f"\n:warning: Errors: {'; '.join(errors)}"
-
-    blocks.append({
-        "type": "context",
-        "elements": [{"type": "mrkdwn", "text": source_text}]
-    })
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": ggp_text[:3000]}
+        })
 
     return {"blocks": blocks}
 
@@ -423,10 +414,18 @@ def main():
     # Filter to upcoming events (next 30 days)
     upcoming = filter_upcoming_events(ggp_events, days_ahead=30)
 
-    print(f"Found {len(bridge_alerts)} bridge alert categories, "
-          f"{len(upcoming)} upcoming GGP events")
+    print("Checking Sausalito tides...")
+    high_tides = fetch_high_tides()
 
-    message = format_slack_message(bridge_alerts, upcoming, ggp_status, errors)
+    print(f"Found {len(bridge_alerts)} bridge alerts, "
+          f"{len(upcoming)} upcoming GGP events, "
+          f"{len(high_tides)} high tides >= {TIDE_THRESHOLD_FT}ft")
+
+    message = format_slack_message(bridge_alerts, upcoming, ggp_status, high_tides, errors)
+
+    if message is None:
+        print("Nothing to report today. No Slack post.")
+        return
 
     if "--dry-run" in sys.argv:
         print("\n--- DRY RUN ---")
