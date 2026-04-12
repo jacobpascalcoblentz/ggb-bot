@@ -1,0 +1,23 @@
+name: Post SF Road Closures
+
+on:
+  schedule:
+    # 7am PT daily (14:00 UTC, or 15:00 UTC during DST)
+    - cron: '0 14 * * *'
+  workflow_dispatch: # manual trigger
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install -r requirements.txt
+
+      - run: python bot.py
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
