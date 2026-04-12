@@ -278,17 +278,22 @@ def filter_upcoming_events(events, days_ahead=30):
     return upcoming
 
 
-def has_sidewalk_closure(bridge_alerts):
-    """Check if any alert indicates sidewalks are fully closed (not just narrowed)."""
+def get_sidewalk_closure_info(bridge_alerts):
+    """If sidewalks are fully closed, return the time range. Otherwise None."""
     if not isinstance(bridge_alerts, list):
-        return False
+        return None
     for alert in bridge_alerts:
         if not isinstance(alert, dict):
             continue
         text = (alert["title"] + " " + " ".join(alert["details"])).upper()
         if "SIDEWALK" in text and "CLOSED" in text and "NARROWED" not in text:
-            return True
-    return False
+            # Extract time range from title + details
+            all_text = alert["title"] + " " + " ".join(alert["details"])
+            time_match = re.search(r"\d{1,2}[:\.]?\d{0,2}\s*-\s*\d{1,2}[:\.]?\d{0,2}\s*[AaPp][Mm]", all_text)
+            if time_match:
+                return time_match.group(0).strip()
+            return "check alert for times"
+    return None
 
 
 def format_slack_message(bridge_alerts, ggp_events, ggp_status, errors):
@@ -296,20 +301,22 @@ def format_slack_message(bridge_alerts, ggp_events, ggp_status, errors):
     today_str = datetime.now().strftime("%A, %B %-d")
     blocks = []
 
-    sidewalk_closed = has_sidewalk_closure(bridge_alerts)
+    closure_time = get_sidewalk_closure_info(bridge_alerts)
 
+    # If sidewalks are closed, just post the urgent alert and tag channel
+    if closure_time:
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": f":rotating_light: <!channel> *GG Bridge sidewalks CLOSED {closure_time}* :rotating_light:\nBikes must take shuttle."}
+        })
+        return {"blocks": blocks}
+
+    # Otherwise, normal daily summary
     # Header
     blocks.append({
         "type": "header",
         "text": {"type": "plain_text", "text": f"SF Road Closures — {today_str}"}
     })
-
-    # @channel ping if sidewalks are closed
-    if sidewalk_closed:
-        blocks.append({
-            "type": "section",
-            "text": {"type": "mrkdwn", "text": "<!channel> GG Bridge sidewalks closed today — bikes must take shuttle"}
-        })
 
     # GG Bridge section
     blocks.append({"type": "divider"})
