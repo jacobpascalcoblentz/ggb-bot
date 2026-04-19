@@ -283,14 +283,18 @@ def filter_upcoming_events(events, days_ahead=30):
 
 
 def fetch_high_tides():
-    """Fetch today's high tides from NOAA for Sausalito.
+    """Fetch today's tide predictions from NOAA for Sausalito.
 
-    Returns list of (time_str, height_ft) for highs >= TIDE_THRESHOLD_FT.
+    Returns list of dicts with keys: start, end, peak_height, peak_time
+    for periods where tide >= TIDE_THRESHOLD_FT during 6am-6pm.
     """
+    RIDE_HOURS_START = 6   # 6am
+    RIDE_HOURS_END = 18    # 6pm
+
     url = (
         "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"
         f"?date=today&station={TIDE_STATION}&product=predictions"
-        "&datum=MLLW&time_zone=lst_ldt&units=english&format=json&interval=hilo"
+        "&datum=MLLW&time_zone=lst_ldt&units=english&format=json"
     )
     try:
         resp = requests.get(url, timeout=15)
@@ -300,19 +304,54 @@ def fetch_high_tides():
         print(f"Tide API error: {e}", file=sys.stderr)
         return []
 
-    high_tides = []
+    # Parse all predictions into (datetime, height) pairs
+    predictions = []
     for pred in data.get("predictions", []):
-        if pred["type"] == "H":
-            height = float(pred["v"])
-            if height >= TIDE_THRESHOLD_FT:
-                # Parse time like "2026-04-12 08:07"
-                try:
-                    t = datetime.strptime(pred["t"], "%Y-%m-%d %H:%M")
-                    time_str = t.strftime("%-I:%M%p").lower()
-                except ValueError:
-                    time_str = pred["t"]
-                high_tides.append((time_str, height))
-    return high_tides
+        try:
+            t = datetime.strptime(pred["t"], "%Y-%m-%d %H:%M")
+            h = float(pred["v"])
+            predictions.append((t, h))
+        except (ValueError, KeyError):
+            continue
+
+    if not predictions:
+        return []
+
+    # Find contiguous intervals above threshold
+    intervals = []
+    in_interval = False
+    for t, h in predictions:
+        if h >= TIDE_THRESHOLD_FT and not in_interval:
+            in_interval = True
+            interval = {"start": t, "end": t, "peak_height": h, "peak_time": t}
+        elif h >= TIDE_THRESHOLD_FT and in_interval:
+            interval["end"] = t
+            if h > interval["peak_height"]:
+                interval["peak_height"] = h
+                interval["peak_time"] = t
+        elif h < TIDE_THRESHOLD_FT and in_interval:
+            in_interval = False
+            intervals.append(interval)
+    if in_interval:
+        intervals.append(interval)
+
+    # Filter to intervals that overlap with ride hours (6am-6pm)
+    def fmt_time(dt):
+        return dt.strftime("%-I:%M%p").lower()
+
+    results = []
+    for iv in intervals:
+        # Skip intervals entirely outside ride hours
+        if iv["end"].hour < RIDE_HOURS_START or iv["start"].hour >= RIDE_HOURS_END:
+            continue
+        results.append({
+            "start": fmt_time(iv["start"]),
+            "end": fmt_time(iv["end"]),
+            "peak_height": iv["peak_height"],
+            "peak_time": fmt_time(iv["peak_time"]),
+        })
+
+    return results
 
 
 def get_sidewalk_closure_info(bridge_alerts):
@@ -352,10 +391,15 @@ def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, erro
 
     # High tides — Sausalito bike path flooding
     if high_tides:
-        tide_parts = [f"{height:.1f}ft at {time}" for time, height in high_tides]
-        tide_text = ":ocean: *Sausalito bike path flood risk* — high tide " + ", ".join(tide_parts)
-        if any(h >= 7.0 for _, h in high_tides):
-            tide_text = f":ocean: <!channel> *King tide warning — Sausalito bike path likely flooded* — {', '.join(tide_parts)}"
+        tide_parts = [
+            f"above {TIDE_THRESHOLD_FT:.0f}ft from {iv['start']} to {iv['end']} (peak {iv['peak_height']:.1f}ft at {iv['peak_time']})"
+            for iv in high_tides
+        ]
+        is_king = any(iv["peak_height"] >= 7.0 for iv in high_tides)
+        if is_king:
+            tide_text = ":ocean: <!channel> *King tide warning — Sausalito bike path likely flooded*\n" + "\n".join(f"• {p}" for p in tide_parts)
+        else:
+            tide_text = ":ocean: *Sausalito bike path flood risk*\n" + "\n".join(f"• Tide {p}" for p in tide_parts)
         blocks.append({
             "type": "section",
             "text": {"type": "mrkdwn", "text": tide_text}
@@ -419,7 +463,7 @@ def main():
 
     print(f"Found {len(bridge_alerts)} bridge alerts, "
           f"{len(upcoming)} upcoming GGP events, "
-          f"{len(high_tides)} high tides >= {TIDE_THRESHOLD_FT}ft")
+          f"{len(high_tides)} high tide periods >= {TIDE_THRESHOLD_FT}ft during ride hours")
 
     message = format_slack_message(bridge_alerts, upcoming, ggp_status, high_tides, errors)
 
