@@ -354,40 +354,123 @@ def fetch_high_tides():
     return results
 
 
-def get_sidewalk_closure_info(bridge_alerts):
-    """If sidewalks are fully closed, return the time range. Otherwise None."""
+def parse_alert_dates(title):
+    """Parse date(s) from an alert title.
+
+    Handles: '5/10', '5/10 - 5/12', '5/9 & 5/10', '5/9, 5/10 & 5/11'.
+    Returns a list of date objects. Empty list if unparseable.
+    Assumes current year.
+    """
+    year = datetime.now().year
+    dates = []
+    # Find all M/D patterns in the title
+    for m in re.finditer(r"(\d{1,2})/(\d{1,2})", title):
+        try:
+            dates.append(datetime(year, int(m.group(1)), int(m.group(2))).date())
+        except ValueError:
+            continue
+
+    if len(dates) < 2:
+        return dates
+
+    # Check if it's a range (dash between two dates) vs discrete dates (& or , separated)
+    # Look at the text between first and second date match
+    first_end = re.search(r"\d{1,2}/\d{1,2}", title).end()
+    between = title[first_end:title.index(str(dates[1].month) + "/" + str(dates[1].day), first_end)]
+    if re.search(r"[-–]", between) and "&" not in between:
+        # It's a range — fill in all dates between start and end
+        from datetime import timedelta
+        filled = []
+        d = dates[0]
+        while d <= dates[-1]:
+            filled.append(d)
+            d += timedelta(days=1)
+        return filled
+
+    return dates
+
+
+def classify_bridge_alerts(bridge_alerts):
+    """Split bridge alerts into today's closures and upcoming ones.
+
+    Returns (today_alerts, upcoming_alerts) where each is a list of dicts
+    with keys: alert, time_range, date_str.
+    """
     if not isinstance(bridge_alerts, list):
-        return None
+        return [], []
+
+    today = datetime.now().date()
+    today_alerts = []
+    upcoming_alerts = []
+
     for alert in bridge_alerts:
         if not isinstance(alert, dict):
             continue
         text = (alert["title"] + " " + " ".join(alert["details"])).upper()
-        if "SIDEWALK" in text and "CLOSED" in text and "NARROWED" not in text:
-            # Extract time range from title + details
-            all_text = alert["title"] + " " + " ".join(alert["details"])
-            time_match = re.search(r"\d{1,2}[:\.]?\d{0,2}\s*-\s*\d{1,2}[:\.]?\d{0,2}\s*[AaPp][Mm]", all_text)
-            if time_match:
-                return time_match.group(0).strip()
-            return "check alert for times"
-    return None
+        if "SIDEWALK" not in text or "NARROWED" in text:
+            continue
+        is_closure = "CLOSED" in text
+
+        # Extract time range
+        all_text = alert["title"] + " " + " ".join(alert["details"])
+        time_match = re.search(r"\d{1,2}[:\.]?\d{0,2}\s*[AaPp]?[Mm]?\s*-\s*\d{1,2}[:\.]?\d{0,2}\s*[AaPp][Mm]", all_text)
+        time_range = time_match.group(0).strip() if time_match else None
+
+        alert_dates = parse_alert_dates(alert["title"])
+
+        info = {
+            "alert": alert,
+            "time_range": time_range,
+            "is_closure": is_closure,
+            "dates": alert_dates,
+        }
+
+        if alert_dates:
+            if today in alert_dates:
+                today_alerts.append(info)
+            elif any(d > today for d in alert_dates):
+                upcoming_alerts.append(info)
+            # Entirely past alerts are dropped
+        else:
+            # Can't parse date — treat as today to be safe
+            today_alerts.append(info)
+
+    return today_alerts, upcoming_alerts
 
 
 def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, errors):
     """Format Slack message. Returns None if nothing to report."""
-    closure_time = get_sidewalk_closure_info(bridge_alerts)
+    today = datetime.now().date()
+    today_closures, upcoming_closures = classify_bridge_alerts(bridge_alerts)
 
     # Only post if there's something actionable
-    if not closure_time and not high_tides and not ggp_events:
+    if not today_closures and not upcoming_closures and not high_tides and not ggp_events:
         return None
 
     blocks = []
 
-    # Sidewalk closure — urgent
-    if closure_time:
+    # Today's sidewalk closures — urgent, @channel with raw alert text
+    for info in today_closures:
+        a = info["alert"]
+        raw = a["title"]
+        if a["details"]:
+            raw += "\n" + "\n".join(a["details"])
         blocks.append({
             "type": "section",
-            "text": {"type": "mrkdwn", "text": f":rotating_light: <!channel> *GG Bridge sidewalks CLOSED {closure_time}* :rotating_light:\nBikes must take shuttle."}
+            "text": {"type": "mrkdwn", "text": f":rotating_light: <!channel> *Golden Gate Bridge alert:*\n{raw}"}
         })
+
+    # Upcoming sidewalk closures — informational, no @channel
+    if upcoming_closures:
+        for info in upcoming_closures:
+            a = info["alert"]
+            raw = a["title"]
+            if a["details"]:
+                raw += "\n" + "\n".join(a["details"])
+            blocks.append({
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f":bridge_at_night: *Golden Gate Bridge alert:*\n{raw}"}
+            })
 
     # High tides — Sausalito bike path flooding
     if high_tides:
