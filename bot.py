@@ -369,12 +369,13 @@ def parse_alert_with_llm(alert):
 
     today_str = datetime.now().strftime("%Y-%m-%d")
     prompt = (
-        "You are parsing Golden Gate Bridge alerts for a cycling club bot.\n\n"
+        "You are parsing Golden Gate Bridge alerts for a cycling club Slack bot.\n\n"
         "Given the raw alert text, extract:\n"
         '- dates: list of dates (as "YYYY-MM-DD")\n'
-        '- time_range: e.g. "8:30AM - 12:30PM" or null\n'
         "- affects_cyclists: true if sidewalk/bike/cyclist related\n"
-        "- is_closure: true if fully closed (not just narrowed/restricted)\n\n"
+        "- is_closure: true if fully closed (not just narrowed/restricted)\n"
+        "- summary: a short, plain-English summary for cyclists (1-2 sentences). "
+        "Include dates, times, and which sidewalk. Be direct and actionable.\n\n"
         f"Today is {today_str}. Assume current year for dates.\n\n"
         "Respond with JSON only, no explanation.\n\n"
         f"Alert: {raw}"
@@ -454,28 +455,21 @@ def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, erro
 
     blocks = []
 
-    # Today's sidewalk closures — urgent, @channel with raw alert text
+    # Today's sidewalk closures — urgent, @channel
     for info in today_closures:
-        a = info["alert"]
-        raw = a["title"]
-        if a["details"]:
-            raw += "\n" + "\n".join(a["details"])
+        summary = info["parsed"].get("summary", info["alert"]["title"])
         blocks.append({
             "type": "section",
-            "text": {"type": "mrkdwn", "text": f":rotating_light: <!channel> *Golden Gate Bridge alert:*\n{raw}"}
+            "text": {"type": "mrkdwn", "text": f":rotating_light: <!channel> *Golden Gate Bridge alert:*\n{summary}"}
         })
 
     # Upcoming sidewalk closures — informational, no @channel
-    if upcoming_closures:
-        for info in upcoming_closures:
-            a = info["alert"]
-            raw = a["title"]
-            if a["details"]:
-                raw += "\n" + "\n".join(a["details"])
-            blocks.append({
-                "type": "section",
-                "text": {"type": "mrkdwn", "text": f":bridge_at_night: *Golden Gate Bridge alert:*\n{raw}"}
-            })
+    for info in upcoming_closures:
+        summary = info["parsed"].get("summary", info["alert"]["title"])
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": f":bridge_at_night: *Golden Gate Bridge alert:*\n{summary}"}
+        })
 
     # High tides — Sausalito bike path flooding
     if high_tides:
