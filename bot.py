@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -354,47 +355,53 @@ def fetch_high_tides():
     return results
 
 
-def parse_alert_dates(title):
-    """Parse date(s) from an alert title.
+def parse_alert_with_llm(alert):
+    """Use Haiku 4.5 to parse a bridge alert into structured data.
 
-    Handles: '5/10', '5/10 - 5/12', '5/9 & 5/10', '5/9, 5/10 & 5/11'.
-    Returns a list of date objects. Empty list if unparseable.
-    Assumes current year.
+    Returns dict with keys: dates (list of date strings), time_range,
+    affects_cyclists, is_closure. Returns None on failure.
     """
-    year = datetime.now().year
-    dates = []
-    # Find all M/D patterns in the title
-    for m in re.finditer(r"(\d{1,2})/(\d{1,2})", title):
-        try:
-            dates.append(datetime(year, int(m.group(1)), int(m.group(2))).date())
-        except ValueError:
-            continue
+    import anthropic
 
-    if len(dates) < 2:
-        return dates
+    raw = alert["title"]
+    if alert["details"]:
+        raw += "\n" + "\n".join(alert["details"])
 
-    # Check if it's a range (dash between two dates) vs discrete dates (& or , separated)
-    # Look at the text between first and second date match
-    first_end = re.search(r"\d{1,2}/\d{1,2}", title).end()
-    between = title[first_end:title.index(str(dates[1].month) + "/" + str(dates[1].day), first_end)]
-    if re.search(r"[-–]", between) and "&" not in between:
-        # It's a range — fill in all dates between start and end
-        from datetime import timedelta
-        filled = []
-        d = dates[0]
-        while d <= dates[-1]:
-            filled.append(d)
-            d += timedelta(days=1)
-        return filled
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    prompt = (
+        "You are parsing Golden Gate Bridge alerts for a cycling club bot.\n\n"
+        "Given the raw alert text, extract:\n"
+        '- dates: list of dates (as "YYYY-MM-DD")\n'
+        '- time_range: e.g. "8:30AM - 12:30PM" or null\n'
+        "- affects_cyclists: true if sidewalk/bike/cyclist related\n"
+        "- is_closure: true if fully closed (not just narrowed/restricted)\n\n"
+        f"Today is {today_str}. Assume current year for dates.\n\n"
+        "Respond with JSON only, no explanation.\n\n"
+        f"Alert: {raw}"
+    )
 
-    return dates
+    try:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=256,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = resp.content[0].text.strip()
+        # Strip markdown code fencing if present
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        return json.loads(text)
+    except Exception as e:
+        print(f"LLM parse error: {e}", file=sys.stderr)
+        return None
 
 
 def classify_bridge_alerts(bridge_alerts):
     """Split bridge alerts into today's closures and upcoming ones.
 
-    Returns (today_alerts, upcoming_alerts) where each is a list of dicts
-    with keys: alert, time_range, date_str.
+    Uses Haiku 4.5 to parse alert dates and determine relevance.
+    Returns (today_alerts, upcoming_alerts).
     """
     if not isinstance(bridge_alerts, list):
         return [], []
@@ -406,22 +413,21 @@ def classify_bridge_alerts(bridge_alerts):
     for alert in bridge_alerts:
         if not isinstance(alert, dict):
             continue
-        text = (alert["title"] + " " + " ".join(alert["details"])).upper()
-        if "SIDEWALK" not in text or "NARROWED" in text:
+
+        parsed = parse_alert_with_llm(alert)
+        if not parsed or not parsed.get("affects_cyclists"):
             continue
-        is_closure = "CLOSED" in text
 
-        # Extract time range
-        all_text = alert["title"] + " " + " ".join(alert["details"])
-        time_match = re.search(r"\d{1,2}[:\.]?\d{0,2}\s*[AaPp]?[Mm]?\s*-\s*\d{1,2}[:\.]?\d{0,2}\s*[AaPp][Mm]", all_text)
-        time_range = time_match.group(0).strip() if time_match else None
-
-        alert_dates = parse_alert_dates(alert["title"])
+        alert_dates = []
+        for d in parsed.get("dates", []):
+            try:
+                alert_dates.append(datetime.strptime(d, "%Y-%m-%d").date())
+            except ValueError:
+                continue
 
         info = {
             "alert": alert,
-            "time_range": time_range,
-            "is_closure": is_closure,
+            "parsed": parsed,
             "dates": alert_dates,
         }
 
@@ -430,7 +436,6 @@ def classify_bridge_alerts(bridge_alerts):
                 today_alerts.append(info)
             elif any(d > today for d in alert_dates):
                 upcoming_alerts.append(info)
-            # Entirely past alerts are dropped
         else:
             # Can't parse date — treat as today to be safe
             today_alerts.append(info)
