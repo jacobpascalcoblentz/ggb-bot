@@ -398,6 +398,36 @@ def parse_alert_with_llm(alert):
         return None
 
 
+def summarize_tides_with_llm(high_tides):
+    """Use Haiku 4.5 to write a short tide summary for Slack."""
+    import anthropic
+
+    tide_data = json.dumps(high_tides, indent=2)
+    prompt = (
+        "You are writing a short Slack alert for a cycling club about high tides "
+        "on the Sausalito bike path (Mill Valley-Sausalito path along the bay).\n\n"
+        "Given the tide data below, write 1-2 sentences summarizing when the path "
+        "may be flooded today. Be direct and actionable. Include times and heights. "
+        "If peak is >= 7ft, emphasize that the path will likely be impassable.\n\n"
+        "Respond with just the summary text, no JSON or formatting.\n\n"
+        f"Tide data:\n{tide_data}"
+    )
+
+    try:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=150,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return resp.content[0].text.strip()
+    except Exception as e:
+        print(f"Tide LLM error: {e}", file=sys.stderr)
+        # Fallback to simple format
+        parts = [f"{iv['peak_height']:.1f}ft at {iv['peak_time']}" for iv in high_tides]
+        return f"Sausalito bike path flood risk — high tide {', '.join(parts)}"
+
+
 def classify_bridge_alerts(bridge_alerts):
     """Split bridge alerts into today's closures and upcoming ones.
 
@@ -450,12 +480,12 @@ def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, erro
     today_closures, upcoming_closures = classify_bridge_alerts(bridge_alerts)
 
     # Only post if there's something actionable
-    if not today_closures and not upcoming_closures and not high_tides and not ggp_events:
+    if not today_closures and not high_tides and not ggp_events:
         return None
 
     blocks = []
 
-    # Today's sidewalk closures — urgent, @channel
+    # Today's sidewalk closures — @channel
     for info in today_closures:
         summary = info["parsed"].get("summary", info["alert"]["title"])
         blocks.append({
@@ -463,25 +493,14 @@ def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, erro
             "text": {"type": "mrkdwn", "text": f":rotating_light: <!channel> *Golden Gate Bridge alert:*\n{summary}"}
         })
 
-    # Upcoming sidewalk closures — informational, no @channel
-    for info in upcoming_closures:
-        summary = info["parsed"].get("summary", info["alert"]["title"])
-        blocks.append({
-            "type": "section",
-            "text": {"type": "mrkdwn", "text": f":bridge_at_night: *Golden Gate Bridge alert:*\n{summary}"}
-        })
-
     # High tides — Sausalito bike path flooding
     if high_tides:
-        tide_parts = [
-            f"above {TIDE_THRESHOLD_FT:.0f}ft from {iv['start']} to {iv['end']} (peak {iv['peak_height']:.1f}ft at {iv['peak_time']})"
-            for iv in high_tides
-        ]
+        tide_summary = summarize_tides_with_llm(high_tides)
         is_king = any(iv["peak_height"] >= 7.0 for iv in high_tides)
         if is_king:
-            tide_text = ":ocean: <!channel> *King tide warning — Sausalito bike path likely flooded*\n" + "\n".join(f"• {p}" for p in tide_parts)
+            tide_text = f":ocean: <!channel> {tide_summary}"
         else:
-            tide_text = ":ocean: *Sausalito bike path flood risk*\n" + "\n".join(f"• Tide {p}" for p in tide_parts)
+            tide_text = f":ocean: {tide_summary}"
         blocks.append({
             "type": "section",
             "text": {"type": "mrkdwn", "text": tide_text}
