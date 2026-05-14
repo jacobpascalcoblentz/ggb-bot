@@ -470,7 +470,7 @@ def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, erro
             f"above {TIDE_THRESHOLD_FT:.0f}ft from {iv['start']} to {iv['end']} (peak {iv['peak_height']:.1f}ft at {iv['peak_time']})"
             for iv in high_tides
         ]
-        is_king = any(iv["peak_height"] >= 7.0 for iv in high_tides)
+        is_king = any(iv["peak_height"] > 6.5 for iv in high_tides)
         if is_king:
             tide_text = ":ocean: <!channel> *King tide warning — Sausalito bike path likely flooded*\n" + "\n".join(f"• {p}" for p in tide_parts)
         else:
