@@ -9,7 +9,7 @@ import json
 import os
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import requests
 from bs4 import BeautifulSoup
@@ -433,10 +433,11 @@ def classify_bridge_alerts(bridge_alerts):
             "dates": alert_dates,
         }
 
+        tomorrow = today + timedelta(days=1)
         if alert_dates:
             if today in alert_dates:
                 today_alerts.append(info)
-            elif any(d > today for d in alert_dates):
+            elif tomorrow in alert_dates:
                 upcoming_alerts.append(info)
         else:
             # Can't parse date — treat as today to be safe
@@ -451,7 +452,7 @@ def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, erro
     today_closures, upcoming_closures = classify_bridge_alerts(bridge_alerts)
 
     # Only post if there's something actionable
-    if not today_closures and not high_tides and not ggp_events:
+    if not today_closures and not upcoming_closures and not high_tides and not ggp_events:
         return None
 
     blocks = []
@@ -462,6 +463,14 @@ def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, erro
         blocks.append({
             "type": "section",
             "text": {"type": "mrkdwn", "text": f":rotating_light: <!channel> *Golden Gate Bridge alert:*\n{summary}"}
+        })
+
+    # Tomorrow's closures — heads up, no @channel
+    for info in upcoming_closures:
+        summary = info["parsed"].get("summary", info["alert"]["title"])
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": f":bridge_at_night: *Golden Gate Bridge — tomorrow:*\n{summary}"}
         })
 
     # High tides — Sausalito bike path flooding
