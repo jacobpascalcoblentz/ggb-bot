@@ -369,10 +369,16 @@ def parse_alert_with_llm(alert):
 
     today_str = datetime.now().strftime("%Y-%m-%d")
     prompt = (
-        "You are parsing Golden Gate Bridge alerts for a cycling club Slack bot.\n\n"
+        "You are parsing Golden Gate Bridge alerts for a cycling club Slack bot. "
+        "Members ride during the day (roughly 6am-6pm). We only care about alerts "
+        "that affect DAYTIME cycling — sidewalk closures, bike path closures, "
+        "or detours happening between 6am and 6pm.\n\n"
         "Given the raw alert text, extract:\n"
         '- dates: list of dates (as "YYYY-MM-DD")\n'
-        "- affects_cyclists: true if sidewalk/bike/cyclist related\n"
+        "- affects_daytime_cyclists: true ONLY if the alert involves a sidewalk/bike "
+        "closure or detour happening during daytime hours (roughly 6am-6pm). "
+        "Set to FALSE for overnight/weeknight lane closures, even if they mention "
+        "bike detours — those don't affect daytime riders.\n"
         "- is_closure: true if fully closed (not just narrowed/restricted)\n"
         "- summary: a short, plain-English summary for cyclists (1-2 sentences). "
         "Include dates, times, and which sidewalk. Be direct and actionable.\n\n"
@@ -417,7 +423,7 @@ def classify_bridge_alerts(bridge_alerts):
             continue
 
         parsed = parse_alert_with_llm(alert)
-        if not parsed or not parsed.get("affects_cyclists"):
+        if not parsed or not parsed.get("affects_daytime_cyclists"):
             continue
 
         alert_dates = []
