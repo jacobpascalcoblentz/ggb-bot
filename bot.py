@@ -392,8 +392,9 @@ def parse_alert_with_llm(alert):
         "- is_closure: true if fully closed (not just narrowed/restricted)\n"
         "- summary: a short, plain-English summary for cyclists (1-2 sentences). "
         "Include dates, times, and which sidewalk. Be direct and actionable.\n\n"
-        f"Today is {today_str}. Assume current year for dates, but if that "
-        "date has already passed this year, assume next year.\n\n"
+        f"Today is {today_str}. Assume the current year for dates. If the "
+        "alert's last day would then have already passed, the dates refer "
+        "to next year.\n\n"
         "Respond with JSON only, no explanation.\n\n"
         f"Alert: {raw}"
     )
@@ -429,6 +430,12 @@ def classify_bridge_alerts(bridge_alerts):
     today_alerts = []
     upcoming_alerts = []
 
+    def to_date(value):
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            return None
+
     for alert in bridge_alerts:
         if not isinstance(alert, dict):
             continue
@@ -437,20 +444,17 @@ def classify_bridge_alerts(bridge_alerts):
         if not parsed or not parsed.get("affects_daytime_cyclists"):
             continue
 
-        def to_date(value):
-            try:
-                return datetime.strptime(value, "%Y-%m-%d").date()
-            except (TypeError, ValueError):
-                return None
-
         start = to_date(parsed.get("start_date"))
         end = to_date(parsed.get("end_date"))
+        # The model sometimes returns only one endpoint (e.g. an open-ended
+        # closure). Treat the known date as a single-day alert rather than
+        # demoting the whole thing to undated.
+        start = start or end
+        end = end or start
 
         info = {
             "alert": alert,
             "parsed": parsed,
-            "start": start,
-            "end": end,
         }
 
         tomorrow = today + timedelta(days=1)
@@ -462,8 +466,8 @@ def classify_bridge_alerts(bridge_alerts):
                 info["when"] = "tomorrow"
                 upcoming_alerts.append(info)
         else:
-            # Can't parse date — heads up without @channel rather than
-            # paging the channel every day the alert stays on the page
+            # No parseable date: post a heads up without @channel rather
+            # than paging the channel every day the alert stays on the page
             info["when"] = "undated"
             upcoming_alerts.append(info)
 
