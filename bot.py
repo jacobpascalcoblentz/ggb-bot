@@ -438,12 +438,16 @@ def classify_bridge_alerts(bridge_alerts):
         tomorrow = today + timedelta(days=1)
         if alert_dates:
             if today in alert_dates:
+                info["when"] = "today"
                 today_alerts.append(info)
             elif tomorrow in alert_dates:
+                info["when"] = "tomorrow"
                 upcoming_alerts.append(info)
         else:
-            # Can't parse date — treat as today to be safe
-            today_alerts.append(info)
+            # Can't parse date — heads up without @channel rather than
+            # paging the channel every day the alert stays on the page
+            info["when"] = "undated"
+            upcoming_alerts.append(info)
 
     return today_alerts, upcoming_alerts
 
@@ -467,12 +471,13 @@ def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, erro
             "text": {"type": "mrkdwn", "text": f":rotating_light: <!channel> *Golden Gate Bridge alert:*\n{summary}"}
         })
 
-    # Tomorrow's closures — heads up, no @channel
+    # Tomorrow's and undated closures — heads up, no @channel
     for info in upcoming_closures:
         summary = info["parsed"].get("summary", info["alert"]["title"])
+        header = "tomorrow" if info["when"] == "tomorrow" else "heads up"
         blocks.append({
             "type": "section",
-            "text": {"type": "mrkdwn", "text": f":bridge_at_night: *Golden Gate Bridge — tomorrow:*\n{summary}"}
+            "text": {"type": "mrkdwn", "text": f":bridge_at_night: *Golden Gate Bridge — {header}:*\n{summary}"}
         })
 
     # High tides — Sausalito bike path flooding
