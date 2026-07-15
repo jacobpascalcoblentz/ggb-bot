@@ -280,17 +280,20 @@ def filter_upcoming_events(events, days_ahead=30):
 
 
 def fetch_high_tides():
-    """Fetch today's tide predictions from NOAA for Sausalito.
+    """Fetch today's and tomorrow's tide predictions from NOAA for Sausalito.
 
-    Returns list of dicts with keys: start, end, peak_height, peak_time
-    for periods where tide >= TIDE_THRESHOLD_FT during 6am-6pm.
+    Returns list of dicts with keys: day ("today" or "tomorrow"), start, end,
+    peak_height, peak_time for periods where tide >= TIDE_THRESHOLD_FT
+    during 6am-6pm.
     """
     RIDE_HOURS_START = 6   # 6am
     RIDE_HOURS_END = 18    # 6pm
 
+    today = datetime.now().date()
     url = (
         "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"
-        f"?date=today&station={TIDE_STATION}&product=predictions"
+        f"?begin_date={today.strftime('%Y%m%d')}&range=48"
+        f"&station={TIDE_STATION}&product=predictions"
         "&datum=MLLW&time_zone=lst_ldt&units=english&format=json"
     )
     try:
@@ -336,12 +339,20 @@ def fetch_high_tides():
     def fmt_time(dt):
         return dt.strftime("%-I:%M%p").lower()
 
+    tomorrow = today + timedelta(days=1)
     results = []
     for iv in intervals:
         # Skip intervals entirely outside ride hours
         if iv["end"].hour < RIDE_HOURS_START or iv["start"].hour >= RIDE_HOURS_END:
             continue
+        if iv["start"].date() == today:
+            day = "today"
+        elif iv["start"].date() == tomorrow:
+            day = "tomorrow"
+        else:
+            continue
         results.append({
+            "day": day,
             "start": fmt_time(iv["start"]),
             "end": fmt_time(iv["end"]),
             "peak_height": iv["peak_height"],
@@ -488,16 +499,29 @@ def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, erro
         })
 
     # High tides — Sausalito bike path flooding
-    if high_tides:
-        tide_parts = [
-            f"above {TIDE_THRESHOLD_FT:.0f}ft from {iv['start']} to {iv['end']} (peak {iv['peak_height']:.1f}ft at {iv['peak_time']})"
-            for iv in high_tides
-        ]
-        is_king = any(iv["peak_height"] > 6.5 for iv in high_tides)
+    def tide_part(iv):
+        return (
+            f"above {TIDE_THRESHOLD_FT:.0f}ft from {iv['start']} to {iv['end']} "
+            f"(peak {iv['peak_height']:.1f}ft at {iv['peak_time']})"
+        )
+
+    today_tides = [iv for iv in high_tides if iv["day"] == "today"]
+    tomorrow_tides = [iv for iv in high_tides if iv["day"] == "tomorrow"]
+
+    if today_tides:
+        is_king = any(iv["peak_height"] > 6.5 for iv in today_tides)
         if is_king:
-            tide_text = ":ocean: <!channel> *King tide warning — Sausalito bike path likely flooded*\n" + "\n".join(f"• {p}" for p in tide_parts)
+            tide_text = ":ocean: <!channel> *King tide warning — Sausalito bike path likely flooded*\n" + "\n".join(f"• {tide_part(iv)}" for iv in today_tides)
         else:
-            tide_text = ":ocean: *Sausalito bike path flood risk*\n" + "\n".join(f"• Tide {p}" for p in tide_parts)
+            tide_text = ":ocean: *Sausalito bike path flood risk*\n" + "\n".join(f"• Tide {tide_part(iv)}" for iv in today_tides)
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": tide_text}
+        })
+
+    # Tomorrow's tides are a heads up with no @channel regardless of height
+    if tomorrow_tides:
+        tide_text = ":ocean: *Sausalito bike path flood risk — tomorrow*\n" + "\n".join(f"• Tide {tide_part(iv)}" for iv in tomorrow_tides)
         blocks.append({
             "type": "section",
             "text": {"type": "mrkdwn", "text": tide_text}
