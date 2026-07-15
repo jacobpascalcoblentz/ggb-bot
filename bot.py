@@ -280,19 +280,27 @@ def filter_upcoming_events(events, days_ahead=30):
 
 
 def fetch_high_tides():
-    """Fetch today's and tomorrow's tide predictions from NOAA for Sausalito.
+    """Fetch today's and tomorrow's high-tide peaks from NOAA for Sausalito.
 
-    Returns list of dicts with keys: day ("today" or "tomorrow"), start, end,
-    peak_height, peak_time for periods where tide >= TIDE_THRESHOLD_FT
-    during 6am-6pm.
+    Station 9414806 is a subordinate station: NOAA only serves high/low
+    predictions for it (interval=hilo), not a continuous series. Requesting
+    the continuous series returns an error payload and no data.
+
+    Returns list of dicts with keys: day ("today" or "tomorrow"),
+    peak_height, peak_time for high tides >= TIDE_THRESHOLD_FT whose
+    high-water window overlaps ride hours (6am-6pm).
     """
     RIDE_HOURS_START = 6   # 6am
     RIDE_HOURS_END = 18    # 6pm
+    # Water stays near the peak height for roughly 90 minutes on either
+    # side, so a peak just outside ride hours can still flood the path
+    # during them.
+    PEAK_WINDOW = timedelta(minutes=90)
 
     today = datetime.now().date()
     url = (
         "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"
-        f"?begin_date={today.strftime('%Y%m%d')}&range=48"
+        f"?begin_date={today.strftime('%Y%m%d')}&range=48&interval=hilo"
         f"&station={TIDE_STATION}&product=predictions"
         "&datum=MLLW&time_zone=lst_ldt&units=english&format=json"
     )
@@ -304,59 +312,34 @@ def fetch_high_tides():
         print(f"Tide API error: {e}", file=sys.stderr)
         return []
 
-    # Parse all predictions into (datetime, height) pairs
-    predictions = []
+    if "error" in data:
+        print(f"Tide API error: {data['error']}", file=sys.stderr)
+        return []
+
+    tomorrow = today + timedelta(days=1)
+    results = []
     for pred in data.get("predictions", []):
         try:
             t = datetime.strptime(pred["t"], "%Y-%m-%d %H:%M")
             h = float(pred["v"])
-            predictions.append((t, h))
         except (ValueError, KeyError):
             continue
-
-    if not predictions:
-        return []
-
-    # Find contiguous intervals above threshold
-    intervals = []
-    in_interval = False
-    for t, h in predictions:
-        if h >= TIDE_THRESHOLD_FT and not in_interval:
-            in_interval = True
-            interval = {"start": t, "end": t, "peak_height": h, "peak_time": t}
-        elif h >= TIDE_THRESHOLD_FT and in_interval:
-            interval["end"] = t
-            if h > interval["peak_height"]:
-                interval["peak_height"] = h
-                interval["peak_time"] = t
-        elif h < TIDE_THRESHOLD_FT and in_interval:
-            in_interval = False
-            intervals.append(interval)
-    if in_interval:
-        intervals.append(interval)
-
-    # Filter to intervals that overlap with ride hours (6am-6pm)
-    def fmt_time(dt):
-        return dt.strftime("%-I:%M%p").lower()
-
-    tomorrow = today + timedelta(days=1)
-    results = []
-    for iv in intervals:
-        # Skip intervals entirely outside ride hours
-        if iv["end"].hour < RIDE_HOURS_START or iv["start"].hour >= RIDE_HOURS_END:
+        if pred.get("type") != "H" or h < TIDE_THRESHOLD_FT:
             continue
-        if iv["start"].date() == today:
+        ride_start = t.replace(hour=RIDE_HOURS_START, minute=0)
+        ride_end = t.replace(hour=RIDE_HOURS_END, minute=0)
+        if t + PEAK_WINDOW <= ride_start or t - PEAK_WINDOW >= ride_end:
+            continue
+        if t.date() == today:
             day = "today"
-        elif iv["start"].date() == tomorrow:
+        elif t.date() == tomorrow:
             day = "tomorrow"
         else:
             continue
         results.append({
             "day": day,
-            "start": fmt_time(iv["start"]),
-            "end": fmt_time(iv["end"]),
-            "peak_height": iv["peak_height"],
-            "peak_time": fmt_time(iv["peak_time"]),
+            "peak_height": h,
+            "peak_time": t.strftime("%-I:%M%p").lower(),
         })
 
     return results
@@ -503,10 +486,10 @@ def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, erro
         })
 
     # High tides — Sausalito bike path flooding
-    def tide_part(iv):
-        return (
-            f"above {TIDE_THRESHOLD_FT:.0f}ft from {iv['start']} to {iv['end']} "
-            f"(peak {iv['peak_height']:.1f}ft at {iv['peak_time']})"
+    def tide_lines(tides):
+        return "\n".join(
+            f"• Tide peaking at {iv['peak_height']:.1f}ft at {iv['peak_time']}"
+            for iv in tides
         )
 
     today_tides = [iv for iv in high_tides if iv["day"] == "today"]
@@ -515,20 +498,19 @@ def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, erro
     if today_tides:
         is_king = any(iv["peak_height"] > 6.5 for iv in today_tides)
         if is_king:
-            tide_text = ":ocean: <!channel> *King tide warning — Sausalito bike path likely flooded*\n" + "\n".join(f"• {tide_part(iv)}" for iv in today_tides)
+            header = ":ocean: <!channel> *King tide warning — Sausalito bike path likely flooded*"
         else:
-            tide_text = ":ocean: *Sausalito bike path flood risk*\n" + "\n".join(f"• Tide {tide_part(iv)}" for iv in today_tides)
+            header = ":ocean: *Sausalito bike path flood risk*"
         blocks.append({
             "type": "section",
-            "text": {"type": "mrkdwn", "text": tide_text}
+            "text": {"type": "mrkdwn", "text": f"{header}\n{tide_lines(today_tides)}"}
         })
 
     # Tomorrow's tides are a heads up with no @channel regardless of height
     if tomorrow_tides:
-        tide_text = ":ocean: *Sausalito bike path flood risk — tomorrow*\n" + "\n".join(f"• Tide {tide_part(iv)}" for iv in tomorrow_tides)
         blocks.append({
             "type": "section",
-            "text": {"type": "mrkdwn", "text": tide_text}
+            "text": {"type": "mrkdwn", "text": f":ocean: *Sausalito bike path flood risk — tomorrow*\n{tide_lines(tomorrow_tides)}"}
         })
 
     # GGP upcoming closures
@@ -589,7 +571,7 @@ def main():
 
     print(f"Found {len(bridge_alerts)} bridge alerts, "
           f"{len(upcoming)} upcoming GGP events, "
-          f"{len(high_tides)} high tide periods >= {TIDE_THRESHOLD_FT}ft during ride hours")
+          f"{len(high_tides)} high tide peaks >= {TIDE_THRESHOLD_FT}ft during ride hours")
 
     message = format_slack_message(bridge_alerts, upcoming, ggp_status, high_tides, errors)
 
