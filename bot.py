@@ -354,8 +354,8 @@ def fetch_high_tides():
 def parse_alert_with_llm(alert):
     """Use Haiku 4.5 to parse a bridge alert into structured data.
 
-    Returns dict with keys: dates (list of date strings), time_range,
-    affects_cyclists, is_closure. Returns None on failure.
+    Returns dict with keys: start_date, end_date, affects_daytime_cyclists,
+    is_closure, summary. Returns None on failure.
     """
     import anthropic
 
@@ -370,7 +370,10 @@ def parse_alert_with_llm(alert):
         "that affect DAYTIME cycling — sidewalk closures, bike path closures, "
         "or detours happening between 6am and 6pm.\n\n"
         "Given the raw alert text, extract:\n"
-        '- dates: list of dates (as "YYYY-MM-DD")\n'
+        '- start_date: first day the alert applies (as "YYYY-MM-DD"), or null '
+        "if the text has no date\n"
+        '- end_date: last day the alert applies (as "YYYY-MM-DD"), equal to '
+        "start_date for single-day alerts, or null if the text has no date\n"
         "- affects_daytime_cyclists: true ONLY if the alert involves a sidewalk/bike "
         "closure or detour happening during daytime hours (roughly 6am-6pm). "
         "Set to FALSE for overnight/weeknight lane closures, even if they mention "
@@ -378,7 +381,8 @@ def parse_alert_with_llm(alert):
         "- is_closure: true if fully closed (not just narrowed/restricted)\n"
         "- summary: a short, plain-English summary for cyclists (1-2 sentences). "
         "Include dates, times, and which sidewalk. Be direct and actionable.\n\n"
-        f"Today is {today_str}. Assume current year for dates.\n\n"
+        f"Today is {today_str}. Assume current year for dates, but if that "
+        "date has already passed this year, assume next year.\n\n"
         "Respond with JSON only, no explanation.\n\n"
         f"Alert: {raw}"
     )
@@ -387,7 +391,7 @@ def parse_alert_with_llm(alert):
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         resp = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=256,
+            max_tokens=512,
             messages=[{"role": "user", "content": prompt}],
         )
         text = resp.content[0].text.strip()
@@ -422,25 +426,28 @@ def classify_bridge_alerts(bridge_alerts):
         if not parsed or not parsed.get("affects_daytime_cyclists"):
             continue
 
-        alert_dates = []
-        for d in parsed.get("dates", []):
+        def to_date(value):
             try:
-                alert_dates.append(datetime.strptime(d, "%Y-%m-%d").date())
-            except ValueError:
-                continue
+                return datetime.strptime(value, "%Y-%m-%d").date()
+            except (TypeError, ValueError):
+                return None
+
+        start = to_date(parsed.get("start_date"))
+        end = to_date(parsed.get("end_date"))
 
         info = {
             "alert": alert,
             "parsed": parsed,
-            "dates": alert_dates,
+            "start": start,
+            "end": end,
         }
 
         tomorrow = today + timedelta(days=1)
-        if alert_dates:
-            if today in alert_dates:
+        if start and end:
+            if start <= today <= end:
                 info["when"] = "today"
                 today_alerts.append(info)
-            elif tomorrow in alert_dates:
+            elif start <= tomorrow <= end:
                 info["when"] = "tomorrow"
                 upcoming_alerts.append(info)
         else:
