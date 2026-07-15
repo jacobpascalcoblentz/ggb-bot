@@ -96,18 +96,14 @@ def scrape_gg_bridge_alerts():
             continue
         seen_text.add(text)
 
-        # Detect title lines: starts with date pattern, or is ALL CAPS and shortish
+        # A line starts a new alert only if it carries a date prefix, or if it's
+        # a short ALL-CAPS heading before any alert has opened. All-caps lines
+        # after an open alert are continuations of it (the site splits one
+        # alert across lines, e.g. "DUE TO SF MARATHON. BIKE SHUTTLES WILL BE
+        # PROVIDED." following a dated closure title).
         has_date_prefix = bool(re.match(r"^\d{1,2}/\d{1,2}", text))
-        is_allcaps_short = text == text.upper() and len(text) < 80
-        is_title = has_date_prefix or (is_allcaps_short and len(text) > 10)
-
-        # "SIDEWALKS CLOSED 5-9:30AM..." after a Mermaid Run title is a detail, not a new alert
-        if is_title and current and any(kw in text.upper() for kw in ["CLOSED", "SHUTTLE"]):
-            if any(kw in current["title"].upper() for kw in ["MERMAID", "RUN", "EVENT", "RACE"]):
-                current["details"].append(text)
-                if href and not current["href"]:
-                    current["href"] = href
-                continue
+        is_allcaps_short = text == text.upper() and 10 < len(text) < 80
+        is_title = has_date_prefix or (is_allcaps_short and current is None)
 
         if is_title:
             if current:
