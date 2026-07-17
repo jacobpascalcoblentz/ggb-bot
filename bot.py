@@ -96,18 +96,14 @@ def scrape_gg_bridge_alerts():
             continue
         seen_text.add(text)
 
-        # Detect title lines: starts with date pattern, or is ALL CAPS and shortish
+        # A line starts a new alert only if it carries a date prefix, or if it's
+        # a short ALL-CAPS heading before any alert has opened. All-caps lines
+        # after an open alert are continuations of it (the site splits one
+        # alert across lines, e.g. "DUE TO SF MARATHON. BIKE SHUTTLES WILL BE
+        # PROVIDED." following a dated closure title).
         has_date_prefix = bool(re.match(r"^\d{1,2}/\d{1,2}", text))
-        is_allcaps_short = text == text.upper() and len(text) < 80
-        is_title = has_date_prefix or (is_allcaps_short and len(text) > 10)
-
-        # "SIDEWALKS CLOSED 5-9:30AM..." after a Mermaid Run title is a detail, not a new alert
-        if is_title and current and any(kw in text.upper() for kw in ["CLOSED", "SHUTTLE"]):
-            if any(kw in current["title"].upper() for kw in ["MERMAID", "RUN", "EVENT", "RACE"]):
-                current["details"].append(text)
-                if href and not current["href"]:
-                    current["href"] = href
-                continue
+        is_allcaps_short = text == text.upper() and 10 < len(text) < 80
+        is_title = has_date_prefix or (is_allcaps_short and current is None)
 
         if is_title:
             if current:
@@ -284,17 +280,28 @@ def filter_upcoming_events(events, days_ahead=30):
 
 
 def fetch_high_tides():
-    """Fetch today's tide predictions from NOAA for Sausalito.
+    """Fetch today's and tomorrow's high-tide peaks from NOAA for Sausalito.
 
-    Returns list of dicts with keys: start, end, peak_height, peak_time
-    for periods where tide >= TIDE_THRESHOLD_FT during 6am-6pm.
+    Station 9414806 is a subordinate station: NOAA only serves high/low
+    predictions for it (interval=hilo), not a continuous series. Requesting
+    the continuous series returns an error payload and no data.
+
+    Returns list of dicts with keys: day ("today" or "tomorrow"),
+    peak_height, peak_time for high tides >= TIDE_THRESHOLD_FT whose
+    high-water window overlaps ride hours (6am-6pm).
     """
     RIDE_HOURS_START = 6   # 6am
     RIDE_HOURS_END = 18    # 6pm
+    # Water stays near the peak height for roughly 90 minutes on either
+    # side, so a peak just outside ride hours can still flood the path
+    # during them.
+    PEAK_WINDOW = timedelta(minutes=90)
 
+    today = datetime.now().date()
     url = (
         "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"
-        f"?date=today&station={TIDE_STATION}&product=predictions"
+        f"?begin_date={today.strftime('%Y%m%d')}&range=48&interval=hilo"
+        f"&station={TIDE_STATION}&product=predictions"
         "&datum=MLLW&time_zone=lst_ldt&units=english&format=json"
     )
     try:
@@ -305,51 +312,34 @@ def fetch_high_tides():
         print(f"Tide API error: {e}", file=sys.stderr)
         return []
 
-    # Parse all predictions into (datetime, height) pairs
-    predictions = []
+    if "error" in data:
+        print(f"Tide API error: {data['error']}", file=sys.stderr)
+        return []
+
+    tomorrow = today + timedelta(days=1)
+    results = []
     for pred in data.get("predictions", []):
         try:
             t = datetime.strptime(pred["t"], "%Y-%m-%d %H:%M")
             h = float(pred["v"])
-            predictions.append((t, h))
         except (ValueError, KeyError):
             continue
-
-    if not predictions:
-        return []
-
-    # Find contiguous intervals above threshold
-    intervals = []
-    in_interval = False
-    for t, h in predictions:
-        if h >= TIDE_THRESHOLD_FT and not in_interval:
-            in_interval = True
-            interval = {"start": t, "end": t, "peak_height": h, "peak_time": t}
-        elif h >= TIDE_THRESHOLD_FT and in_interval:
-            interval["end"] = t
-            if h > interval["peak_height"]:
-                interval["peak_height"] = h
-                interval["peak_time"] = t
-        elif h < TIDE_THRESHOLD_FT and in_interval:
-            in_interval = False
-            intervals.append(interval)
-    if in_interval:
-        intervals.append(interval)
-
-    # Filter to intervals that overlap with ride hours (6am-6pm)
-    def fmt_time(dt):
-        return dt.strftime("%-I:%M%p").lower()
-
-    results = []
-    for iv in intervals:
-        # Skip intervals entirely outside ride hours
-        if iv["end"].hour < RIDE_HOURS_START or iv["start"].hour >= RIDE_HOURS_END:
+        if pred.get("type") != "H" or h < TIDE_THRESHOLD_FT:
+            continue
+        ride_start = t.replace(hour=RIDE_HOURS_START, minute=0)
+        ride_end = t.replace(hour=RIDE_HOURS_END, minute=0)
+        if t + PEAK_WINDOW <= ride_start or t - PEAK_WINDOW >= ride_end:
+            continue
+        if t.date() == today:
+            day = "today"
+        elif t.date() == tomorrow:
+            day = "tomorrow"
+        else:
             continue
         results.append({
-            "start": fmt_time(iv["start"]),
-            "end": fmt_time(iv["end"]),
-            "peak_height": iv["peak_height"],
-            "peak_time": fmt_time(iv["peak_time"]),
+            "day": day,
+            "peak_height": h,
+            "peak_time": t.strftime("%-I:%M%p").lower(),
         })
 
     return results
@@ -358,8 +348,8 @@ def fetch_high_tides():
 def parse_alert_with_llm(alert):
     """Use Haiku 4.5 to parse a bridge alert into structured data.
 
-    Returns dict with keys: dates (list of date strings), time_range,
-    affects_cyclists, is_closure. Returns None on failure.
+    Returns dict with keys: start_date, end_date, affects_daytime_cyclists,
+    is_closure, summary. Returns None on failure.
     """
     import anthropic
 
@@ -374,7 +364,10 @@ def parse_alert_with_llm(alert):
         "that affect DAYTIME cycling — sidewalk closures, bike path closures, "
         "or detours happening between 6am and 6pm.\n\n"
         "Given the raw alert text, extract:\n"
-        '- dates: list of dates (as "YYYY-MM-DD")\n'
+        '- start_date: first day the alert applies (as "YYYY-MM-DD"), or null '
+        "if the text has no date\n"
+        '- end_date: last day the alert applies (as "YYYY-MM-DD"), equal to '
+        "start_date for single-day alerts, or null if the text has no date\n"
         "- affects_daytime_cyclists: true ONLY if the alert involves a sidewalk/bike "
         "closure or detour happening during daytime hours (roughly 6am-6pm). "
         "Set to FALSE for overnight/weeknight lane closures, even if they mention "
@@ -382,7 +375,9 @@ def parse_alert_with_llm(alert):
         "- is_closure: true if fully closed (not just narrowed/restricted)\n"
         "- summary: a short, plain-English summary for cyclists (1-2 sentences). "
         "Include dates, times, and which sidewalk. Be direct and actionable.\n\n"
-        f"Today is {today_str}. Assume current year for dates.\n\n"
+        f"Today is {today_str}. Assume the current year for dates. If the "
+        "alert's last day would then have already passed, the dates refer "
+        "to next year.\n\n"
         "Respond with JSON only, no explanation.\n\n"
         f"Alert: {raw}"
     )
@@ -391,7 +386,7 @@ def parse_alert_with_llm(alert):
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         resp = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=256,
+            max_tokens=512,
             messages=[{"role": "user", "content": prompt}],
         )
         text = resp.content[0].text.strip()
@@ -418,6 +413,12 @@ def classify_bridge_alerts(bridge_alerts):
     today_alerts = []
     upcoming_alerts = []
 
+    def to_date(value):
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            return None
+
     for alert in bridge_alerts:
         if not isinstance(alert, dict):
             continue
@@ -426,28 +427,32 @@ def classify_bridge_alerts(bridge_alerts):
         if not parsed or not parsed.get("affects_daytime_cyclists"):
             continue
 
-        alert_dates = []
-        for d in parsed.get("dates", []):
-            try:
-                alert_dates.append(datetime.strptime(d, "%Y-%m-%d").date())
-            except ValueError:
-                continue
+        start = to_date(parsed.get("start_date"))
+        end = to_date(parsed.get("end_date"))
+        # The model sometimes returns only one endpoint (e.g. an open-ended
+        # closure). Treat the known date as a single-day alert rather than
+        # demoting the whole thing to undated.
+        start = start or end
+        end = end or start
 
         info = {
             "alert": alert,
             "parsed": parsed,
-            "dates": alert_dates,
         }
 
         tomorrow = today + timedelta(days=1)
-        if alert_dates:
-            if today in alert_dates:
+        if start and end:
+            if start <= today <= end:
+                info["when"] = "today"
                 today_alerts.append(info)
-            elif tomorrow in alert_dates:
+            elif start <= tomorrow <= end:
+                info["when"] = "tomorrow"
                 upcoming_alerts.append(info)
         else:
-            # Can't parse date — treat as today to be safe
-            today_alerts.append(info)
+            # No parseable date: post a heads up without @channel rather
+            # than paging the channel every day the alert stays on the page
+            info["when"] = "undated"
+            upcoming_alerts.append(info)
 
     return today_alerts, upcoming_alerts
 
@@ -471,28 +476,41 @@ def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, erro
             "text": {"type": "mrkdwn", "text": f":rotating_light: <!channel> *Golden Gate Bridge alert:*\n{summary}"}
         })
 
-    # Tomorrow's closures — heads up, no @channel
+    # Tomorrow's and undated closures — heads up, no @channel
     for info in upcoming_closures:
         summary = info["parsed"].get("summary", info["alert"]["title"])
+        header = "tomorrow" if info["when"] == "tomorrow" else "heads up"
         blocks.append({
             "type": "section",
-            "text": {"type": "mrkdwn", "text": f":bridge_at_night: *Golden Gate Bridge — tomorrow:*\n{summary}"}
+            "text": {"type": "mrkdwn", "text": f":bridge_at_night: *Golden Gate Bridge — {header}:*\n{summary}"}
         })
 
     # High tides — Sausalito bike path flooding
-    if high_tides:
-        tide_parts = [
-            f"above {TIDE_THRESHOLD_FT:.0f}ft from {iv['start']} to {iv['end']} (peak {iv['peak_height']:.1f}ft at {iv['peak_time']})"
-            for iv in high_tides
-        ]
-        is_king = any(iv["peak_height"] > 6.5 for iv in high_tides)
+    def tide_lines(tides):
+        return "\n".join(
+            f"• Tide peaking at {iv['peak_height']:.1f}ft at {iv['peak_time']}"
+            for iv in tides
+        )
+
+    today_tides = [iv for iv in high_tides if iv["day"] == "today"]
+    tomorrow_tides = [iv for iv in high_tides if iv["day"] == "tomorrow"]
+
+    if today_tides:
+        is_king = any(iv["peak_height"] > 6.5 for iv in today_tides)
         if is_king:
-            tide_text = ":ocean: <!channel> *King tide warning — Sausalito bike path likely flooded*\n" + "\n".join(f"• {p}" for p in tide_parts)
+            header = ":ocean: <!channel> *King tide warning — Sausalito bike path likely flooded*"
         else:
-            tide_text = ":ocean: *Sausalito bike path flood risk*\n" + "\n".join(f"• Tide {p}" for p in tide_parts)
+            header = ":ocean: *Sausalito bike path flood risk*"
         blocks.append({
             "type": "section",
-            "text": {"type": "mrkdwn", "text": tide_text}
+            "text": {"type": "mrkdwn", "text": f"{header}\n{tide_lines(today_tides)}"}
+        })
+
+    # Tomorrow's tides are a heads up with no @channel regardless of height
+    if tomorrow_tides:
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": f":ocean: *Sausalito bike path flood risk — tomorrow*\n{tide_lines(tomorrow_tides)}"}
         })
 
     # GGP upcoming closures
@@ -553,7 +571,7 @@ def main():
 
     print(f"Found {len(bridge_alerts)} bridge alerts, "
           f"{len(upcoming)} upcoming GGP events, "
-          f"{len(high_tides)} high tide periods >= {TIDE_THRESHOLD_FT}ft during ride hours")
+          f"{len(high_tides)} high tide peaks >= {TIDE_THRESHOLD_FT}ft during ride hours")
 
     message = format_slack_message(bridge_alerts, upcoming, ggp_status, high_tides, errors)
 
