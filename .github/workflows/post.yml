@@ -6,6 +6,9 @@ on:
     - cron: '0 14 * * *'
   workflow_dispatch: # manual trigger
 
+permissions:
+  contents: write # for the keepalive commit
+
 jobs:
   post:
     runs-on: ubuntu-latest
@@ -22,3 +25,18 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      # GitHub disables scheduled workflows after 60 days without repo activity.
+      # Push an empty commit if the last one is 50+ days old.
+      - name: Keepalive
+        if: always()
+        run: |
+          last=$(git log -1 --format=%ct)
+          age_days=$(( ($(date +%s) - last) / 86400 ))
+          echo "Last commit was $age_days days ago"
+          if [ "$age_days" -ge 50 ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "Keepalive: prevent scheduled workflow from being disabled"
+            git push
+          fi
