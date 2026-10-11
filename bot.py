@@ -28,6 +28,10 @@ HEADERS = {
 # NOAA station 9414806 = Sausalito
 TIDE_STATION = "9414806"
 TIDE_THRESHOLD_FT = 6.0
+# NOAA station 9414290 = San Francisco (Golden Gate). Sausalito has no live
+# water-level sensor, so we measure how far the ocean is running above
+# prediction here and apply that to Sausalito.
+ANOMALY_STATION = "9414290"
 
 
 def scrape_gg_bridge_alerts():
@@ -279,12 +283,48 @@ def filter_upcoming_events(events, days_ahead=30):
     return upcoming
 
 
-def fetch_high_tides():
+def fetch_tide_anomaly():
+    """Return how far observed water is running above predicted, in feet.
+
+    Predictions only model astronomical tides. Ocean conditions (e.g. a
+    coastal Kelvin wave during El Niño, or storm surge) can push actual
+    levels a foot or more higher for weeks. Averages observed - predicted
+    over the past 24 hours at the Golden Gate. Never negative: we'd rather
+    over-warn than miss a flooded path. Returns 0.0 on failure.
+    """
+    base = (
+        "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"
+        f"?range=24&station={ANOMALY_STATION}"
+        "&datum=MLLW&time_zone=lst_ldt&units=english&format=json"
+    )
+    try:
+        obs = requests.get(base + "&product=water_level", timeout=15).json()
+        pred = requests.get(base + "&product=predictions", timeout=15).json()
+    except (requests.RequestException, ValueError) as e:
+        print(f"Tide anomaly API error: {e}", file=sys.stderr)
+        return 0.0
+
+    predicted = {p["t"]: float(p["v"]) for p in pred.get("predictions", []) if p.get("v")}
+    residuals = [
+        float(o["v"]) - predicted[o["t"]]
+        for o in obs.get("data", [])
+        if o.get("v") and o["t"] in predicted
+    ]
+    if not residuals:
+        print(f"Tide anomaly: no data ({obs.get('error') or pred.get('error')})", file=sys.stderr)
+        return 0.0
+    return max(0.0, sum(residuals) / len(residuals))
+
+
+def fetch_high_tides(anomaly=0.0):
     """Fetch today's and tomorrow's high-tide peaks from NOAA for Sausalito.
 
     Station 9414806 is a subordinate station: NOAA only serves high/low
     predictions for it (interval=hilo), not a continuous series. Requesting
     the continuous series returns an error payload and no data.
+
+    `anomaly` (feet) is added to every prediction to account for water
+    running above the astronomical forecast (see fetch_tide_anomaly).
 
     Returns list of dicts with keys: day ("today" or "tomorrow"),
     peak_height, peak_time for high tides >= TIDE_THRESHOLD_FT whose
@@ -321,7 +361,7 @@ def fetch_high_tides():
     for pred in data.get("predictions", []):
         try:
             t = datetime.strptime(pred["t"], "%Y-%m-%d %H:%M")
-            h = float(pred["v"])
+            h = float(pred["v"]) + anomaly
         except (ValueError, KeyError):
             continue
         if pred.get("type") != "H" or h < TIDE_THRESHOLD_FT:
@@ -457,7 +497,7 @@ def classify_bridge_alerts(bridge_alerts):
     return today_alerts, upcoming_alerts
 
 
-def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, errors):
+def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, errors, tide_anomaly=0.0):
     """Format Slack message. Returns None if nothing to report."""
     today = datetime.now().date()
     today_closures, upcoming_closures = classify_bridge_alerts(bridge_alerts)
@@ -487,10 +527,13 @@ def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, erro
 
     # High tides — Sausalito bike path flooding
     def tide_lines(tides):
-        return "\n".join(
+        lines = "\n".join(
             f"• Tide peaking at {iv['peak_height']:.1f}ft at {iv['peak_time']}"
             for iv in tides
         )
+        if tide_anomaly >= 0.1:
+            lines += f"\n_Includes +{tide_anomaly:.1f}ft — water has been running above forecast_"
+        return lines
 
     today_tides = [iv for iv in high_tides if iv["day"] == "today"]
     tomorrow_tides = [iv for iv in high_tides if iv["day"] == "tomorrow"]
@@ -567,13 +610,15 @@ def main():
     upcoming = filter_upcoming_events(ggp_events, days_ahead=30)
 
     print("Checking Sausalito tides...")
-    high_tides = fetch_high_tides()
+    tide_anomaly = fetch_tide_anomaly()
+    print(f"Water running {tide_anomaly:+.2f}ft vs. predicted (past 24h, Golden Gate)")
+    high_tides = fetch_high_tides(tide_anomaly)
 
     print(f"Found {len(bridge_alerts)} bridge alerts, "
           f"{len(upcoming)} upcoming GGP events, "
           f"{len(high_tides)} high tide peaks >= {TIDE_THRESHOLD_FT}ft during ride hours")
 
-    message = format_slack_message(bridge_alerts, upcoming, ggp_status, high_tides, errors)
+    message = format_slack_message(bridge_alerts, upcoming, ggp_status, high_tides, errors, tide_anomaly)
 
     if message is None:
         print("Nothing to report today. No Slack post.")
