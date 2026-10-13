@@ -11,3 +11,4 @@ captured_at,image,model_sausalito_ft,observed_sf_ft,observed_sf_at,anomaly_ft,pe
 2026-10-13 12:34,2026-10-13/1234.jpg,6.44,6.60,2026-10-13 12:30,0.84,2026-10-13 13:24,6.57,no,"The parking lot, Shoreline Hwy, and ramp pavement all appear dry in full sun, with no standing water visible."
 2026-10-13 12:48,2026-10-13/1248.jpg,6.50,6.71,2026-10-13 12:42,0.84,2026-10-13 13:24,6.57,no,"The road and parking lot appear dry in this daytime view, with no standing water visible, only normal pavement and car shadows."
 2026-10-13 13:06,2026-10-13/1306.jpg,6.55,6.82,2026-10-13 13:00,0.84,2026-10-13 13:24,6.57,no,"The parking lot and Shoreline Hwy pavement appear dry in this sunny midday view, with no standing water visible and clear shadows cast on the asphalt."
+2026-10-13 13:27,2026-10-13/1327.jpg,6.56,6.80,2026-10-13 13:18,0.84,2026-10-13 13:24,6.56,no,"The road and parking lot pavement appear dry in this sunny midday view, with no standing water visible on the surfaces."
