@@ -6,6 +6,7 @@ and posts a morning summary to Slack.
 """
 
 import json
+import math
 import os
 import re
 import sys
@@ -32,6 +33,15 @@ TIDE_THRESHOLD_FT = 6.0
 # water-level sensor, so we measure how far the ocean is running above
 # prediction here and apply that to Sausalito.
 ANOMALY_STATION = "9414290"
+# Water level (ft MLLW) at which the Sausalito path starts flooding, and how
+# long it takes to drain once the water drops back below it. Calibrated to
+# riders' experience that a 6.0ft high tide floods the path ~30 min before
+# the peak and it's clear ~1.5h after: on a typical tide the water is within
+# ~0.1ft of the peak for 30 min on either side, and the extra hour is drainage.
+FLOOD_LEVEL_FT = 5.9
+DRAIN_LAG = timedelta(minutes=60)
+# Shoreline Hwy floods along with the path; this cam shows it live.
+FLOOD_CAM_URL = "https://www.clubevexia.com/live-web-cams/"
 
 
 def scrape_gg_bridge_alerts():
@@ -316,6 +326,30 @@ def fetch_tide_anomaly():
     return max(0.0, sum(residuals) / len(residuals))
 
 
+def crossing_time(a, b, level):
+    """When the water passes `level` between consecutive extremes a and b.
+
+    a and b are (datetime, height) high/low predictions. The tide between
+    extremes follows a half cosine, the standard way to interpolate NOAA
+    high/low tables.
+    """
+    (ta, ha), (tb, hb) = a, b
+    frac = (level - hb) / (ha - hb)
+    theta = math.acos(max(-1.0, min(1.0, 2 * frac - 1)))
+    return ta + (tb - ta) * (theta / math.pi)
+
+
+def round_time(t, minutes=15):
+    """Round to the nearest quarter hour; the estimate isn't finer than that."""
+    t = t.replace(second=0, microsecond=0)
+    t += timedelta(minutes=minutes / 2)
+    return t - timedelta(minutes=t.minute % minutes)
+
+
+def fmt_time(t):
+    return t.strftime("%-I:%M%p").lower()
+
+
 def fetch_high_tides(anomaly=0.0):
     """Fetch today's and tomorrow's high-tide peaks from NOAA for Sausalito.
 
@@ -327,20 +361,21 @@ def fetch_high_tides(anomaly=0.0):
     running above the astronomical forecast (see fetch_tide_anomaly).
 
     Returns list of dicts with keys: day ("today" or "tomorrow"),
-    peak_height, peak_time for high tides >= TIDE_THRESHOLD_FT whose
-    high-water window overlaps ride hours (6am-6pm).
+    peak_height, peak_time, and flood_start/flood_end (formatted times, or
+    None if the neighboring low tides are missing) for high tides >=
+    TIDE_THRESHOLD_FT whose flood window overlaps ride hours (6am-6pm).
     """
     RIDE_HOURS_START = 6   # 6am
     RIDE_HOURS_END = 18    # 6pm
-    # Water stays near the peak height for roughly 90 minutes on either
-    # side, so a peak just outside ride hours can still flood the path
-    # during them.
+    # Fallback window when we can't compute one from the neighboring lows
     PEAK_WINDOW = timedelta(minutes=90)
 
     today = datetime.now().date()
+    # Start yesterday so today's first high has the low before it
+    begin = today - timedelta(days=1)
     url = (
         "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"
-        f"?begin_date={today.strftime('%Y%m%d')}&range=48&interval=hilo"
+        f"?begin_date={begin.strftime('%Y%m%d')}&range=96&interval=hilo"
         f"&station={TIDE_STATION}&product=predictions"
         "&datum=MLLW&time_zone=lst_ldt&units=english&format=json"
     )
@@ -356,19 +391,19 @@ def fetch_high_tides(anomaly=0.0):
         print(f"Tide API error: {data['error']}", file=sys.stderr)
         return []
 
-    tomorrow = today + timedelta(days=1)
-    results = []
+    extremes = []
     for pred in data.get("predictions", []):
         try:
             t = datetime.strptime(pred["t"], "%Y-%m-%d %H:%M")
             h = float(pred["v"]) + anomaly
         except (ValueError, KeyError):
             continue
-        if pred.get("type") != "H" or h < TIDE_THRESHOLD_FT:
-            continue
-        ride_start = t.replace(hour=RIDE_HOURS_START, minute=0)
-        ride_end = t.replace(hour=RIDE_HOURS_END, minute=0)
-        if t + PEAK_WINDOW <= ride_start or t - PEAK_WINDOW >= ride_end:
+        extremes.append((t, h, pred.get("type")))
+
+    tomorrow = today + timedelta(days=1)
+    results = []
+    for i, (t, h, kind) in enumerate(extremes):
+        if kind != "H" or h < TIDE_THRESHOLD_FT:
             continue
         if t.date() == today:
             day = "today"
@@ -376,10 +411,26 @@ def fetch_high_tides(anomaly=0.0):
             day = "tomorrow"
         else:
             continue
+
+        flood_start = flood_end = None
+        if 0 < i < len(extremes) - 1 and h > FLOOD_LEVEL_FT:
+            prev_low, next_low = extremes[i - 1], extremes[i + 1]
+            flood_start = crossing_time(prev_low[:2], (t, h), FLOOD_LEVEL_FT)
+            flood_end = crossing_time((t, h), next_low[:2], FLOOD_LEVEL_FT) + DRAIN_LAG
+
+        window_start = flood_start or t - PEAK_WINDOW
+        window_end = flood_end or t + PEAK_WINDOW
+        ride_start = t.replace(hour=RIDE_HOURS_START, minute=0)
+        ride_end = t.replace(hour=RIDE_HOURS_END, minute=0)
+        if window_end <= ride_start or window_start >= ride_end:
+            continue
+
         results.append({
             "day": day,
             "peak_height": h,
-            "peak_time": t.strftime("%-I:%M%p").lower(),
+            "peak_time": fmt_time(t),
+            "flood_start": fmt_time(round_time(flood_start)) if flood_start else None,
+            "flood_end": fmt_time(round_time(flood_end)) if flood_end else None,
         })
 
     return results
@@ -525,15 +576,20 @@ def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, erro
             "text": {"type": "mrkdwn", "text": f":bridge_at_night: *Golden Gate Bridge — {header}:*\n{summary}"}
         })
 
-    # High tides — Sausalito bike path flooding
+    # High tides — Sausalito bike path flooding. No @channel: with the
+    # water running high these come often enough that pinging would be noise.
     def tide_lines(tides):
-        lines = "\n".join(
-            f"• Tide peaking at {iv['peak_height']:.1f}ft at {iv['peak_time']}"
-            for iv in tides
-        )
+        lines = []
+        for iv in tides:
+            peak = f"peak {iv['peak_height']:.1f}ft at {iv['peak_time']}"
+            if iv["flood_start"]:
+                lines.append(f"• Flooded ~{iv['flood_start']}–{iv['flood_end']} ({peak})")
+            else:
+                lines.append(f"• Tide {peak}")
+        text = "\n".join(lines)
         if tide_anomaly >= 0.1:
-            lines += f"\n_Includes +{tide_anomaly:.1f}ft — water has been running above forecast_"
-        return lines
+            text += f"\n_Includes +{tide_anomaly:.1f}ft — water has been running above forecast_"
+        return text
 
     today_tides = [iv for iv in high_tides if iv["day"] == "today"]
     tomorrow_tides = [iv for iv in high_tides if iv["day"] == "tomorrow"]
@@ -541,15 +597,15 @@ def format_slack_message(bridge_alerts, ggp_events, ggp_status, high_tides, erro
     if today_tides:
         is_king = any(iv["peak_height"] > 6.5 for iv in today_tides)
         if is_king:
-            header = ":ocean: <!channel> *King tide warning — Sausalito bike path likely flooded*"
+            header = ":ocean: *King tide — Sausalito bike path likely flooded*"
         else:
             header = ":ocean: *Sausalito bike path flood risk*"
+        cam = f"<{FLOOD_CAM_URL}|Live cam at Shoreline Hwy>"
         blocks.append({
             "type": "section",
-            "text": {"type": "mrkdwn", "text": f"{header}\n{tide_lines(today_tides)}"}
+            "text": {"type": "mrkdwn", "text": f"{header}\n{tide_lines(today_tides)}\n{cam}"}
         })
 
-    # Tomorrow's tides are a heads up with no @channel regardless of height
     if tomorrow_tides:
         blocks.append({
             "type": "section",
