@@ -1,0 +1,51 @@
+name: Flood cam capture
+
+# Snapshots the Club Evexia Shoreline Hwy cam every 15 minutes around big
+# high tides, to calibrate the flood window in bot.py. Captures and a CSV log
+# are committed to the flood-cam branch, keeping images out of main.
+
+on:
+  schedule:
+    # Every 15 min, ~6am-8pm Pacific. flood_cam.py decides whether to capture.
+    - cron: "*/15 13-23,0-3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write # to push to the flood-cam branch
+
+concurrency:
+  group: flood-cam
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for a big tide
+        id: check
+        run: python3 flood_cam.py --check >> "$GITHUB_OUTPUT"
+
+      - name: Check out flood-cam branch
+        if: steps.check.outputs.capture == 'true'
+        run: |
+          if git ls-remote --exit-code --heads origin flood-cam; then
+            git fetch --depth=1 origin flood-cam
+            git worktree add -B flood-cam data FETCH_HEAD
+          else
+            git worktree add --orphan -b flood-cam data
+          fi
+
+      - name: Capture
+        if: steps.check.outputs.capture == 'true'
+        run: python3 flood_cam.py data
+
+      - name: Commit
+        if: steps.check.outputs.capture == 'true'
+        working-directory: data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Flood cam capture $(TZ=America/Los_Angeles date '+%Y-%m-%d %H:%M')"
+          git push origin flood-cam
