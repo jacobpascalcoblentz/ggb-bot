@@ -14,6 +14,7 @@ Usage:
   flood_cam.py OUT_DIR     save snapshot + append to OUT_DIR/log.csv
 """
 
+import base64
 import csv
 import json
 import math
@@ -39,6 +40,7 @@ DRAIN_WATCH = timedelta(minutes=90)
 DAYLIGHT = (6, 19)  # the cam is too dark to judge flooding at night
 
 NOAA = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"
+VISION_MODEL = "claude-haiku-5-5"
 
 
 def get_json(url):
@@ -114,6 +116,59 @@ def observed_now():
         return None, None
 
 
+def classify_flooding(image_path):
+    """Ask Haiku whether the snapshot shows tidal flooding.
+
+    Returns (flooded, notes): flooded is "yes", "no" or "" if the call
+    failed or ANTHROPIC_API_KEY isn't set.
+    """
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        return "", "no ANTHROPIC_API_KEY"
+    with open(image_path, "rb") as f:
+        image_b64 = base64.b64encode(f.read()).decode()
+    prompt = (
+        "This is a webcam snapshot from Club Evexia, 100 Shoreline Hwy, Mill "
+        "Valley, CA, looking over its parking lot toward Shoreline Hwy and the "
+        "US-101 ramps beside Richardson Bay. During very high tides, bay water "
+        "floods the low road and lot. Is there standing tidal water on the "
+        "road or parking lot? Wet pavement from rain or reflections from "
+        "lights at night are not flooding.\n\n"
+        'Respond with JSON only: {"flooded": true|false, "notes": "<one short '
+        'sentence on where the water is, or why you can\'t tell>"}'
+    )
+    body = json.dumps({
+        "model": VISION_MODEL,
+        "max_tokens": 2000,
+        "messages": [{"role": "user", "content": [
+            {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image_b64}},
+            {"type": "text", "text": prompt},
+        ]}],
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=body,
+        headers={
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            content = json.load(resp)["content"]
+        # Skip any thinking blocks ahead of the answer
+        text = next(b["text"] for b in content if b["type"] == "text").strip()
+        # Strip markdown code fencing if present
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        result = json.loads(text)
+        return ("yes" if result["flooded"] else "no"), result.get("notes", "")
+    except Exception as e:
+        print(f"Flood classification failed: {e}", file=sys.stderr)
+        return "", f"classification failed: {e}"[:200]
+
+
 def main():
     now = datetime.now(TZ).replace(tzinfo=None)
     anomaly = fetch_anomaly()
@@ -137,6 +192,7 @@ def main():
     with urllib.request.urlopen(req, timeout=30) as resp, open(image, "wb") as f:
         f.write(resp.read())
 
+    flooded, notes = classify_flooding(image)
     obs_time, obs_ft = observed_now()
     model_ft = level_at(extremes, now)
     peak_time, peak_ft = peak
@@ -149,7 +205,9 @@ def main():
         "anomaly_ft": f"{anomaly:.2f}",
         "peak_at": f"{peak_time:%Y-%m-%d %H:%M}",
         "peak_ft": f"{peak_ft:.2f}",
-        "flooded": "",  # filled in by hand when reviewing
+        # Haiku's call; correct by hand when reviewing if it's wrong
+        "flooded": flooded,
+        "notes": notes,
     }
     log = os.path.join(out_dir, "log.csv")
     new = not os.path.exists(log)
@@ -159,7 +217,8 @@ def main():
             writer.writeheader()
         writer.writerow(row)
     print(f"Captured {row['image']}: model {row['model_sausalito_ft']}ft, "
-          f"observed SF {row['observed_sf_ft']}ft (peak {peak_ft:.1f}ft at {peak_time:%H:%M})")
+          f"observed SF {row['observed_sf_ft']}ft (peak {peak_ft:.1f}ft at {peak_time:%H:%M}), "
+          f"flooded: {flooded or '?'} ({notes})")
 
 
 if __name__ == "__main__":

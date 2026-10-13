@@ -38,6 +38,8 @@ jobs:
 
       - name: Capture
         if: steps.check.outputs.capture == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python3 flood_cam.py data
 
       - name: Commit
