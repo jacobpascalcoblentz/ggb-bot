@@ -1,23 +1,23 @@
-captured_at,image,model_sausalito_ft,observed_sf_ft,observed_sf_at,anomaly_ft,peak_at,peak_ft,flooded,notes
-2026-10-13 10:05,2026-10-13/1005.jpg,4.88,4.86,2026-10-13 10:00,0.86,2026-10-13 13:24,6.59,no,"The parking lot and Shoreline Hwy pavement look dry in the sunny midday view, with crisp shadows and no standing water visible."
-2026-10-13 10:25,2026-10-13/1025.jpg,5.14,5.09,2026-10-13 10:18,0.86,2026-10-13 13:24,6.58,no,"The Shoreline Hwy roadway, parking lot, and surrounding pavement all appear dry with no standing water visible in this daytime snapshot."
-2026-10-13 10:38,2026-10-13/1038.jpg,5.30,5.27,2026-10-13 10:30,0.86,2026-10-13 13:24,6.58,no,"The road and parking lot pavement appear dry in this sunny midday view, with no standing water visible."
-2026-10-13 10:51,2026-10-13/1051.jpg,5.46,5.47,2026-10-13 10:42,0.86,2026-10-13 13:24,6.58,no,"The Shoreline Hwy roadway and the parking lot appear dry in this sunny daytime view, with no standing water visible on the pavement."
-2026-10-13 11:07,2026-10-13/1107.jpg,5.65,5.68,2026-10-13 11:00,0.85,2026-10-13 13:24,6.58,no,"The road, parking lot, and drive aisles appear dry in the sunny daytime view, with no standing water visible."
-2026-10-13 11:34,2026-10-13/1134.jpg,5.95,6.01,2026-10-13 11:30,0.85,2026-10-13 13:24,6.58,no,"The parking lot and Shoreline Hwy pavement appear dry in this sunny midday view, with no standing water visible and clear cast shadows on the asphalt."
-2026-10-13 11:54,2026-10-13/1154.jpg,6.15,6.24,2026-10-13 11:48,0.85,2026-10-13 13:24,6.57,no,"The road and parking lot pavement look dry in the sunny daytime view, with no visible standing water, only shadows and parked cars."
-2026-10-13 12:04,2026-10-13/1204.jpg,6.23,6.35,2026-10-13 12:00,0.85,2026-10-13 13:24,6.57,no,"The road and parking lot pavement look dry in this daytime view, with no standing water visible and cars driving and parking normally."
-2026-10-13 12:22,2026-10-13/1222.jpg,6.36,6.45,2026-10-13 12:18,0.84,2026-10-13 13:24,6.57,no,"The Shoreline Hwy lanes, the parking lot, and the curbs in this daytime view appear dry with no standing water visible."
-2026-10-13 12:34,2026-10-13/1234.jpg,6.44,6.60,2026-10-13 12:30,0.84,2026-10-13 13:24,6.57,no,"The parking lot, Shoreline Hwy, and ramp pavement all appear dry in full sun, with no standing water visible."
-2026-10-13 12:48,2026-10-13/1248.jpg,6.50,6.71,2026-10-13 12:42,0.84,2026-10-13 13:24,6.57,no,"The road and parking lot appear dry in this daytime view, with no standing water visible, only normal pavement and car shadows."
-2026-10-13 13:06,2026-10-13/1306.jpg,6.55,6.82,2026-10-13 13:00,0.84,2026-10-13 13:24,6.57,no,"The parking lot and Shoreline Hwy pavement appear dry in this sunny midday view, with no standing water visible and clear shadows cast on the asphalt."
-2026-10-13 13:27,2026-10-13/1327.jpg,6.56,6.80,2026-10-13 13:18,0.84,2026-10-13 13:24,6.56,no,"The road and parking lot pavement appear dry in this sunny midday view, with no standing water visible on the surfaces."
-2026-10-13 13:41,2026-10-13/1341.jpg,6.54,6.76,2026-10-13 13:36,0.84,2026-10-13 13:24,6.56,no,"The parking lot, Shoreline Hwy, and the ramp area all look dry in bright sunlight, with no standing water visible."
-2026-10-13 13:50,2026-10-13/1350.jpg,6.50,6.78,2026-10-13 13:42,0.84,2026-10-13 13:24,6.56,no,"The road and parking lot pavement look dry in this sunny midday view, with no standing water visible on Shoreline Hwy, the lot, or the on-ramps."
-2026-10-13 14:04,2026-10-13/1404.jpg,6.42,6.67,2026-10-13 14:00,0.84,2026-10-13 13:24,6.56,no,"The road and parking lot appear dry in bright sunlight, with no standing water visible on the pavement."
-2026-10-13 14:21,2026-10-13/1421.jpg,6.28,6.51,2026-10-13 14:12,0.84,2026-10-13 13:24,6.56,no,"The Shoreline Hwy roadway, parking lot, and lot entrances appear dry in this daytime view, with no standing water visible."
-2026-10-13 14:33,2026-10-13/1433.jpg,6.16,6.38,2026-10-13 14:24,0.83,2026-10-13 13:24,6.56,no,"The parking lot and Shoreline Hwy pavement appear dry in this daytime view, with no standing water visible."
-2026-10-13 14:47,2026-10-13/1447.jpg,5.99,6.12,2026-10-13 14:42,0.83,2026-10-13 13:24,6.56,no,"The road and parking lot pavement look dry in this daytime view, with no standing water visible and only normal shadows and surface sheen."
-2026-10-13 15:04,2026-10-13/1504.jpg,5.74,5.88,2026-10-13 15:00,0.83,2026-10-13 13:24,6.56,no,"The parking lot, Shoreline Hwy, and ramp pavement appear dry in this daytime view, with no standing water visible."
-2026-10-13 15:22,2026-10-13/1522.jpg,5.45,5.58,2026-10-13 15:18,0.83,2026-10-13 13:24,6.56,no,"The parking lot and Shoreline Hwy pavement look dry in the sunlit scene, with no standing water or reflective sheen visible."
-2026-10-13 15:34,2026-10-13/1534.jpg,5.24,5.45,2026-10-13 15:24,0.83,2026-10-13 13:24,6.55,no,"The parking lot and Shoreline Hwy pavement look dry in full sun with crisp shadows, and no standing water is visible on the road or lot."
+captured_at,image,model_sausalito_ft,observed_sf_ft,observed_sf_at,anomaly_ft,peak_at,peak_ft,flooded,label_source,notes
+2026-10-13 10:05,2026-10-13/1005.jpg,4.88,4.86,2026-10-13 10:00,0.86,2026-10-13 13:24,6.59,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 10:25,2026-10-13/1025.jpg,5.14,5.09,2026-10-13 10:18,0.86,2026-10-13 13:24,6.58,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 10:38,2026-10-13/1038.jpg,5.30,5.27,2026-10-13 10:30,0.86,2026-10-13 13:24,6.58,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 10:51,2026-10-13/1051.jpg,5.46,5.47,2026-10-13 10:42,0.86,2026-10-13 13:24,6.58,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 11:07,2026-10-13/1107.jpg,5.65,5.68,2026-10-13 11:00,0.85,2026-10-13 13:24,6.58,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 11:34,2026-10-13/1134.jpg,5.95,6.01,2026-10-13 11:30,0.85,2026-10-13 13:24,6.58,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 11:54,2026-10-13/1154.jpg,6.15,6.24,2026-10-13 11:48,0.85,2026-10-13 13:24,6.57,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 12:04,2026-10-13/1204.jpg,6.23,6.35,2026-10-13 12:00,0.85,2026-10-13 13:24,6.57,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 12:22,2026-10-13/1222.jpg,6.36,6.45,2026-10-13 12:18,0.84,2026-10-13 13:24,6.57,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 12:34,2026-10-13/1234.jpg,6.44,6.60,2026-10-13 12:30,0.84,2026-10-13 13:24,6.57,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 12:48,2026-10-13/1248.jpg,6.50,6.71,2026-10-13 12:42,0.84,2026-10-13 13:24,6.57,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 13:06,2026-10-13/1306.jpg,6.55,6.82,2026-10-13 13:00,0.84,2026-10-13 13:24,6.57,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 13:27,2026-10-13/1327.jpg,6.56,6.80,2026-10-13 13:18,0.84,2026-10-13 13:24,6.56,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 13:41,2026-10-13/1341.jpg,6.54,6.76,2026-10-13 13:36,0.84,2026-10-13 13:24,6.56,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 13:50,2026-10-13/1350.jpg,6.50,6.78,2026-10-13 13:42,0.84,2026-10-13 13:24,6.56,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 14:04,2026-10-13/1404.jpg,6.42,6.67,2026-10-13 14:00,0.84,2026-10-13 13:24,6.56,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 14:21,2026-10-13/1421.jpg,6.28,6.51,2026-10-13 14:12,0.84,2026-10-13 13:24,6.56,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 14:33,2026-10-13/1433.jpg,6.16,6.38,2026-10-13 14:24,0.83,2026-10-13 13:24,6.56,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 14:47,2026-10-13/1447.jpg,5.99,6.12,2026-10-13 14:42,0.83,2026-10-13 13:24,6.56,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 15:04,2026-10-13/1504.jpg,5.74,5.88,2026-10-13 15:00,0.83,2026-10-13 13:24,6.56,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 15:22,2026-10-13/1522.jpg,5.45,5.58,2026-10-13 15:18,0.83,2026-10-13 13:24,6.56,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
+2026-10-13 15:34,2026-10-13/1534.jpg,5.24,5.45,2026-10-13 15:24,0.83,2026-10-13 13:24,6.55,yes,rider,Rider: path behind the statuary yard (D4:G4) flooded all day
