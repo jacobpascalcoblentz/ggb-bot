@@ -2,7 +2,8 @@ name: Flood cam capture
 
 # Snapshots the Club Evexia Shoreline Hwy cam every 15 minutes around big
 # high tides, to calibrate the flood window in bot.py. Captures and a CSV log
-# are committed to the flood-cam branch, keeping images out of main.
+# are committed to the flood-cam branch, keeping images out of main, along
+# with calibration.md (see calibrate.py). Opens an issue once the fit is good.
 
 on:
   schedule:
@@ -12,6 +13,7 @@ on:
 
 permissions:
   contents: write # to push to the flood-cam branch
+  issues: write # to announce when calibration is ready
 
 concurrency:
   group: flood-cam
@@ -42,6 +44,11 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python3 flood_cam.py data
 
+      - name: Calibrate
+        id: calibrate
+        if: steps.check.outputs.capture == 'true'
+        run: python3 calibrate.py data >> "$GITHUB_OUTPUT"
+
       - name: Commit
         if: steps.check.outputs.capture == 'true'
         working-directory: data
@@ -51,3 +58,23 @@ jobs:
           git add -A
           git commit -m "Flood cam capture $(TZ=America/Los_Angeles date '+%Y-%m-%d %H:%M')"
           git push origin flood-cam
+
+      - name: Announce calibration ready
+        if: steps.calibrate.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Flood calibration ready"
+          existing=$(gh issue list --state all --search "\"$title\" in:title" --json number -q 'length')
+          if [ "$existing" -eq 0 ]; then
+            {
+              echo "Enough tides have been captured to calibrate the flood window."
+              echo "Update FLOOD_LEVEL_FT and DRAIN_LAG in bot.py from the fit below,"
+              echo "then disable the Flood cam capture workflow."
+              echo
+              echo "Report: ${{ github.server_url }}/${{ github.repository }}/blob/flood-cam/calibration.md"
+              echo
+              cat data/calibration.md
+            } > body.md
+            gh issue create --title "$title" --body-file body.md
+          fi
