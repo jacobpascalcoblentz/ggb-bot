@@ -28,7 +28,7 @@ import math
 import os
 import sys
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("America/Los_Angeles")
@@ -55,7 +55,12 @@ FIELDS = [
     "observed_sf_at", "anomaly_ft", "peak_at", "peak_ft", "flooded",
     "label_source", "notes",
 ]
-DAYLIGHT = (6, 19)  # the cam is too dark to judge flooding at night
+# The cam is too dark to judge flooding near or after sunset (a fixed
+# 6am-7pm window let a dusk shot with lamp glare become the dry reference).
+# Gate on the sun's height instead: degrees above the horizon.
+CAM_LAT, CAM_LON = 37.88, -122.52
+MIN_SUN_ELEVATION = 5
+MIN_SUN_ELEVATION_REF = 15  # the reference needs good light
 
 NOAA = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"
 VISION_MODEL = "claude-haiku-5-5"
@@ -114,13 +119,36 @@ def level_at(extremes, t):
     return None
 
 
+def sun_elevation(now):
+    """Sun's height above the horizon at the cam, in degrees.
+
+    NOAA's general solar position approximation; `now` is naive local time.
+    """
+    utc = now.replace(tzinfo=TZ).astimezone(timezone.utc)
+    day = utc.timetuple().tm_yday
+    hour = utc.hour + utc.minute / 60
+    g = 2 * math.pi / 365 * (day - 1 + (hour - 12) / 24)
+    eqtime = 229.18 * (0.000075 + 0.001868 * math.cos(g) - 0.032077 * math.sin(g)
+                       - 0.014615 * math.cos(2 * g) - 0.040849 * math.sin(2 * g))
+    decl = (0.006918 - 0.399912 * math.cos(g) + 0.070257 * math.sin(g)
+            - 0.006758 * math.cos(2 * g) + 0.000907 * math.sin(2 * g)
+            - 0.002697 * math.cos(3 * g) + 0.00148 * math.sin(3 * g))
+    solar_minutes = hour * 60 + eqtime + 4 * CAM_LON
+    hour_angle = math.radians(solar_minutes / 4 - 180)
+    lat = math.radians(CAM_LAT)
+    cos_zenith = (math.sin(lat) * math.sin(decl)
+                  + math.cos(lat) * math.cos(decl) * math.cos(hour_angle))
+    return 90 - math.degrees(math.acos(max(-1.0, min(1.0, cos_zenith))))
+
+
 def capture_mode(extremes, now):
     """What to capture now: ("tide", (peak_time, peak_ft)), ("dry", None) or None."""
-    if not DAYLIGHT[0] <= now.hour < DAYLIGHT[1]:
+    sun = sun_elevation(now)
+    if sun < MIN_SUN_ELEVATION:
         return None
     level = level_at(extremes, now)
     if level is not None and level <= DRY_REF_LEVEL_FT:
-        return "dry", None
+        return ("dry", None) if sun >= MIN_SUN_ELEVATION_REF else None
     levels = [level, level_at(extremes, now - DRAIN_WATCH)]
     if not any(lv is not None and lv >= CAPTURE_LEVEL_FT for lv in levels):
         return None
