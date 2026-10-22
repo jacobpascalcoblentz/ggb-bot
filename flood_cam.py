@@ -252,10 +252,13 @@ def classify_flooding(image_path, reference):
 
 
 def snapshot(path):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    """Save a cam snapshot to `path`. Raises OSError if the cam is unreachable."""
     req = urllib.request.Request(SNAPSHOT_URL, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=30) as resp, open(path, "wb") as f:
-        f.write(resp.read())
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = resp.read()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(data)
 
 
 def load_reference(out_dir):
@@ -326,11 +329,17 @@ def main():
     model_ft = level_at(extremes, now)
     rows = load_log(out_dir)
 
-    if kind == "dry":
-        update_reference(out_dir, now, model_ft)
-    else:
-        image = os.path.join(out_dir, f"{now:%Y-%m-%d}", f"{now:%H%M}.jpg")
-        snapshot(image)
+    try:
+        if kind == "dry":
+            update_reference(out_dir, now, model_ft)
+        else:
+            image = os.path.join(out_dir, f"{now:%Y-%m-%d}", f"{now:%H%M}.jpg")
+            snapshot(image)
+    except OSError as e:
+        # The cam goes offline now and then; skip this slot rather than fail
+        print(f"Cam unavailable, skipping: {e}")
+        return
+    if kind != "dry":
         obs_time, obs_ft = observed_now()
         peak_time, peak_ft = peak
         rows.append({
