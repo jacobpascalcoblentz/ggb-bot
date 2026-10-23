@@ -101,46 +101,46 @@ captured_at,image,model_sausalito_ft,observed_sf_ft,observed_sf_at,anomaly_ft,pe
 2026-10-15 14:35,2026-10-15/1435.jpg,6.07,6.38,2026-10-15 14:30,0.75,2026-10-15 14:34,6.07,yes,haiku,"In image 2 the strip looks smoother and more uniformly light, with a sheen where image 1 shows the path's texture, edge lines and curb detail, which suggests standing water."
 2026-10-15 14:46,2026-10-15/1446.jpg,6.06,6.32,2026-10-15 14:42,0.75,2026-10-15 14:34,6.07,no,haiku,"The pale path strip left of the large tree still shows its texture and edges as in image 1, with no smooth, uniform, or reflective sheen hiding the ground features."
 2026-10-15 15:05,2026-10-15/1505.jpg,6.00,6.20,2026-10-15 15:00,0.75,2026-10-15 14:34,6.07,no,haiku,"The path area in image 2 keeps the same ground features, such as the light markings and texture visible in image 1, with no uniform or reflective surface hiding them."
-2026-10-15 15:24,2026-10-15/1524.jpg,5.90,6.17,2026-10-15 15:18,0.75,2026-10-15 14:34,6.07,,,
-2026-10-15 15:34,2026-10-15/1534.jpg,5.83,6.16,2026-10-15 15:24,0.75,2026-10-15 14:34,6.07,,,
-2026-10-15 15:47,2026-10-15/1547.jpg,5.73,6.01,2026-10-15 15:42,0.75,2026-10-15 14:34,6.07,,,
-2026-10-15 16:03,2026-10-15/1603.jpg,5.56,5.85,2026-10-15 15:54,0.75,2026-10-15 14:34,6.07,,,
-2026-10-15 16:20,2026-10-15/1620.jpg,5.37,5.67,2026-10-15 16:12,0.75,2026-10-15 14:34,6.07,,,
-2026-10-15 16:32,2026-10-15/1632.jpg,5.20,5.48,2026-10-15 16:24,0.75,2026-10-15 14:34,6.07,,,
-2026-10-15 16:47,2026-10-15/1647.jpg,5.00,5.23,2026-10-15 16:42,0.75,2026-10-15 14:34,6.07,,,
-2026-10-15 17:12,2026-10-15/1712.jpg,4.60,4.75,2026-10-15 17:06,0.76,2026-10-15 14:34,6.07,,,
-2026-10-15 17:54,2026-10-15/1754.jpg,3.87,4.01,2026-10-15 17:48,0.76,2026-10-15 14:34,6.07,,,
-2026-10-16 07:50,2026-10-16/0750.jpg,4.70,4.78,2026-10-16 07:42,0.83,2026-10-16 05:42,4.94,,,
-2026-10-16 08:04,2026-10-16/0804.jpg,4.66,4.75,2026-10-16 08:00,0.83,2026-10-16 05:42,4.94,,,
-2026-10-16 08:23,2026-10-16/0823.jpg,4.61,4.68,2026-10-16 08:18,0.83,2026-10-16 05:42,4.95,,,
-2026-10-16 08:35,2026-10-16/0835.jpg,4.59,4.61,2026-10-16 08:30,0.84,2026-10-16 05:42,4.95,,,
-2026-10-16 08:48,2026-10-16/0848.jpg,4.56,4.60,2026-10-16 08:42,0.84,2026-10-16 05:42,4.95,,,
-2026-10-16 09:06,2026-10-16/0906.jpg,4.54,4.59,2026-10-16 09:00,0.84,2026-10-16 05:42,4.95,,,
-2026-10-16 09:26,2026-10-16/0926.jpg,4.52,4.51,2026-10-16 09:18,0.84,2026-10-16 05:42,4.96,,,
-2026-10-16 09:38,2026-10-16/0938.jpg,4.52,4.51,2026-10-16 09:30,0.85,2026-10-16 05:42,4.96,,,
-2026-10-16 09:50,2026-10-16/0950.jpg,4.52,4.47,2026-10-16 09:42,0.85,2026-10-16 05:42,4.96,,,
-2026-10-16 10:04,2026-10-16/1004.jpg,4.53,4.56,2026-10-16 10:00,0.85,2026-10-16 05:42,4.96,,,
-2026-10-16 10:21,2026-10-16/1021.jpg,4.57,4.58,2026-10-16 10:12,0.85,2026-10-16 05:42,4.96,,,
-2026-10-16 10:33,2026-10-16/1033.jpg,4.60,4.63,2026-10-16 10:24,0.85,2026-10-16 15:21,5.91,,,
-2026-10-16 10:47,2026-10-16/1047.jpg,4.65,4.71,2026-10-16 10:42,0.85,2026-10-16 15:21,5.91,,,
-2026-10-16 11:06,2026-10-16/1106.jpg,4.73,4.76,2026-10-16 11:00,0.86,2026-10-16 15:21,5.91,,,
-2026-10-16 11:28,2026-10-16/1128.jpg,4.84,4.92,2026-10-16 11:24,0.86,2026-10-16 15:21,5.92,,,
-2026-10-16 11:45,2026-10-16/1145.jpg,4.94,5.00,2026-10-16 11:36,0.86,2026-10-16 15:21,5.92,,,
-2026-10-16 12:04,2026-10-16/1204.jpg,5.06,5.08,2026-10-16 11:54,0.86,2026-10-16 15:21,5.92,,,
-2026-10-16 12:20,2026-10-16/1220.jpg,5.16,5.20,2026-10-16 12:12,0.87,2026-10-16 15:21,5.92,,,
-2026-10-16 12:33,2026-10-16/1233.jpg,5.25,5.36,2026-10-16 12:24,0.87,2026-10-16 15:21,5.92,,,
-2026-10-16 12:47,2026-10-16/1247.jpg,5.33,5.45,2026-10-16 12:42,0.87,2026-10-16 15:21,5.93,,,
-2026-10-16 13:04,2026-10-16/1304.jpg,5.44,5.54,2026-10-16 13:00,0.87,2026-10-16 15:21,5.93,,,
-2026-10-16 13:24,2026-10-16/1324.jpg,5.56,5.66,2026-10-16 13:18,0.87,2026-10-16 15:21,5.93,,,
-2026-10-16 13:36,2026-10-16/1336.jpg,5.63,5.73,2026-10-16 13:30,0.87,2026-10-16 15:21,5.93,,,
-2026-10-16 13:49,2026-10-16/1349.jpg,5.69,5.80,2026-10-16 13:42,0.87,2026-10-16 15:21,5.93,,,
-2026-10-16 14:04,2026-10-16/1404.jpg,5.76,5.87,2026-10-16 14:00,0.87,2026-10-16 15:21,5.93,,,
-2026-10-16 14:21,2026-10-16/1421.jpg,5.83,5.94,2026-10-16 14:12,0.87,2026-10-16 15:21,5.93,,,
-2026-10-16 14:32,2026-10-16/1432.jpg,5.86,6.03,2026-10-16 14:24,0.87,2026-10-16 15:21,5.93,,,
-2026-10-16 14:47,2026-10-16/1447.jpg,5.90,6.08,2026-10-16 14:42,0.87,2026-10-16 15:21,5.93,,,
-2026-10-16 15:05,2026-10-16/1505.jpg,5.92,6.11,2026-10-16 15:00,0.88,2026-10-16 15:21,5.93,,,
-2026-10-16 15:23,2026-10-16/1523.jpg,5.93,6.12,2026-10-16 15:18,0.88,2026-10-16 15:21,5.93,,,
-2026-10-16 15:34,2026-10-16/1534.jpg,5.92,6.14,2026-10-16 15:24,0.88,2026-10-16 15:21,5.93,,,
+2026-10-15 15:24,2026-10-15/1524.jpg,5.90,6.17,2026-10-15 15:18,0.75,2026-10-15 14:34,6.07,no,haiku,"The bench, garden edging and ground texture visible in image 1 remain visible in image 2, with no smooth or reflective water surface hiding them; the differences are mainly lighting and the moved items."
+2026-10-15 15:34,2026-10-15/1534.jpg,5.83,6.16,2026-10-15 15:24,0.75,2026-10-15 14:34,6.07,no,haiku,"The ground features visible in image 1, including the white rail and darker path texture, still appear in image 2, with no smooth or reflective water surface covering them."
+2026-10-15 15:47,2026-10-15/1547.jpg,5.73,6.01,2026-10-15 15:42,0.75,2026-10-15 14:34,6.07,no,haiku,"The path area in image 2 shows the same ground features, edges, and light-colored surfaces as image 1, with no smooth reflective sheen or hidden detail indicating standing water."
+2026-10-15 16:03,2026-10-15/1603.jpg,5.56,5.85,2026-10-15 15:54,0.75,2026-10-15 14:34,6.07,no,haiku,"The path area in image 2 shows the same ground texture and objects as image 1, with no uniform reflective sheen or smooth water surface hiding them; the visible differences are lighting, shadows, and parked or moved items."
+2026-10-15 16:20,2026-10-15/1620.jpg,5.37,5.67,2026-10-15 16:12,0.75,2026-10-15 14:34,6.07,no,haiku,"The lower ground strip in image 2 still shows the same features as image 1, including the pale horizontal marking near the centre, with no smooth or reflective water surface hiding them."
+2026-10-15 16:32,2026-10-15/1632.jpg,5.20,5.48,2026-10-15 16:24,0.75,2026-10-15 14:34,6.07,no,haiku,"In image 2 the ground and vegetation edges visible in image 1 still appear, with no clear smooth or reflective water surface covering the path; the differences look mostly like lighting, shadows, and objects moved, so this is a low-confidence call."
+2026-10-15 16:47,2026-10-15/1647.jpg,5.00,5.23,2026-10-15 16:42,0.75,2026-10-15 14:34,6.07,yes,haiku,"In image 2 the ground between the statuary yard and the large tree looks darker, smoother and more uniform, and the light-colored features and texture visible in image 1 are largely hidden, consistent with a reflective water surface."
+2026-10-15 17:12,2026-10-15/1712.jpg,4.60,4.75,2026-10-15 17:06,0.76,2026-10-15 14:34,6.07,no,haiku,"In image 2 the white edge line and ground features visible in image 1 remain distinguishable, and the differences look like blur, lighting and parked vehicles rather than a uniform reflective water surface."
+2026-10-15 17:54,2026-10-15/1754.jpg,3.87,4.01,2026-10-15 17:48,0.76,2026-10-15 14:34,6.07,no,haiku,"In image 2 the ground still shows the same textured surface, edges and markings as in image 1, with no smooth or reflective sheen where water would hide them; the visible differences are from vehicles and lighting."
+2026-10-16 07:50,2026-10-16/0750.jpg,4.70,4.78,2026-10-16 07:42,0.83,2026-10-16 05:42,4.94,no,haiku,"The path area in image 2 still shows the same ground-level features and textures as image 1, with no smooth or reflective water surface hiding them; the visible differences are mainly vehicles and framing."
+2026-10-16 08:04,2026-10-16/0804.jpg,4.66,4.75,2026-10-16 08:00,0.83,2026-10-16 05:42,4.94,no,haiku,"The lower strip in image 2 still shows the same paving edges, shrub bases, and light-colored garden objects seen in image 1, with no smooth reflective sheet hiding the ground, though the crops are low resolution and confidence is limited."
+2026-10-16 08:23,2026-10-16/0823.jpg,4.61,4.68,2026-10-16 08:18,0.83,2026-10-16 05:42,4.95,no,haiku,"Image 2 shows no uniform or reflective water surface where the textured ground of image 1 was visible; the differences appear to come from the parked vehicles, the red figure and statuary, and lighting, and the low-resolution crops make this only a tentative call."
+2026-10-16 08:35,2026-10-16/0835.jpg,4.59,4.61,2026-10-16 08:30,0.84,2026-10-16 05:42,4.95,no,haiku,"In image 2 the path area behind the statuary still shows the same textured ground, curbs and posts as image 1, with no uniform reflective sheet of water evident, though the low-resolution crops make this uncertain."
+2026-10-16 08:48,2026-10-16/0848.jpg,4.56,4.60,2026-10-16 08:42,0.84,2026-10-16 05:42,4.95,yes,haiku,"In image 2 the light-toned path surface visible in image 1 is replaced by a dark, uniform, reflective-looking area, which suggests water covering the ground."
+2026-10-16 09:06,2026-10-16/0906.jpg,4.54,4.59,2026-10-16 09:00,0.84,2026-10-16 05:42,4.95,no,haiku,"Image 2 shows the same ground texture, pale statuary and rail features as image 1, with no uniform smooth or reflective sheen hiding them, so the differences look like lighting, shadows and moved garden items."
+2026-10-16 09:26,2026-10-16/0926.jpg,4.52,4.51,2026-10-16 09:18,0.84,2026-10-16 05:42,4.96,no,haiku,"The path area in image 2 still shows ground features and textured surfaces similar to image 1, with no uniform, reflective water sheen obscuring them, though the low-resolution crops make this uncertain."
+2026-10-16 09:38,2026-10-16/0938.jpg,4.52,4.51,2026-10-16 09:30,0.85,2026-10-16 05:42,4.96,no,haiku,"The ground features and tones visible in image 1 remain visible in image 2 with no smooth, uniform, or reflective sheen that would suggest standing water over the path."
+2026-10-16 09:50,2026-10-16/0950.jpg,4.52,4.47,2026-10-16 09:42,0.85,2026-10-16 05:42,4.96,no,haiku,"The path area in image 2 still shows the same grey pavement texture and edge features seen in image 1, with no smooth, uniform, or reflective water surface visible."
+2026-10-16 10:04,2026-10-16/1004.jpg,4.53,4.56,2026-10-16 10:00,0.85,2026-10-16 05:42,4.96,no,haiku,"The path area in image 2 shows the same textured ground, fence line and vegetation as image 1, with no smooth, reflective sheen or loss of ground detail that would indicate standing water."
+2026-10-16 10:21,2026-10-16/1021.jpg,4.57,4.58,2026-10-16 10:12,0.85,2026-10-16 05:42,4.96,no,haiku,"The pale bar, dark shrub shapes, and ground texture visible in image 1 are still distinguishable in image 2, with no uniform reflective water sheen covering the path."
+2026-10-16 10:33,2026-10-16/1033.jpg,4.60,4.63,2026-10-16 10:24,0.85,2026-10-16 15:21,5.91,no,haiku,"The path and curb features visible in image 1 still show as textured pavement in image 2, with no smooth or reflective water surface hiding them; the differences are mainly lighting and objects."
+2026-10-16 10:47,2026-10-16/1047.jpg,4.65,4.71,2026-10-16 10:42,0.85,2026-10-16 15:21,5.91,yes,haiku,"In image 2 the pale ground texture seen in image 1 near the white bar is replaced by a smooth, bluish reflective sheen, consistent with standing water."
+2026-10-16 11:06,2026-10-16/1106.jpg,4.73,4.76,2026-10-16 11:00,0.86,2026-10-16 15:21,5.91,no,haiku,"The path area in image 2 still shows the same pavement texture and curb edges as image 1, with no uniform or reflective sheen hiding them; the visible differences are from people, cars, and garden items."
+2026-10-16 11:28,2026-10-16/1128.jpg,4.84,4.92,2026-10-16 11:24,0.86,2026-10-16 15:21,5.92,no,haiku,"The light pale strip near the statuary yard, which appears as a distinct horizontal feature in image 1, is still visible in the same place in image 2, so the ground detail isn't hidden by a uniform reflective water surface."
+2026-10-16 11:45,2026-10-16/1145.jpg,4.94,5.00,2026-10-16 11:36,0.86,2026-10-16 15:21,5.92,no,haiku,"The path region in image 2 shows the same gray pavement texture and edges as image 1, with no smooth, uniform, or reflective water surface obscuring the ground features."
+2026-10-16 12:04,2026-10-16/1204.jpg,5.06,5.08,2026-10-16 11:54,0.86,2026-10-16 15:21,5.92,no,haiku,"In image 2 the light horizontal pavement strip and the ground details beside the statue remain visible as in image 1, with no uniform reflective sheen covering them, though the low-resolution crops make this uncertain."
+2026-10-16 12:20,2026-10-16/1220.jpg,5.16,5.20,2026-10-16 12:12,0.87,2026-10-16 15:21,5.92,no,haiku,"The ground and white fixtures visible in image 1 remain distinguishable in image 2, with no uniform reflective sheen covering the path area."
+2026-10-16 12:33,2026-10-16/1233.jpg,5.25,5.36,2026-10-16 12:24,0.87,2026-10-16 15:21,5.92,no,haiku,"The ground features visible in image 1, including the pale path strip and statuary bases, remain distinct in image 2 with no smooth, uniform, or reflective water surface covering them."
+2026-10-16 12:47,2026-10-16/1247.jpg,5.33,5.45,2026-10-16 12:42,0.87,2026-10-16 15:21,5.93,no,haiku,"Image 2 shows the same ground features as image 1 (the light paving strip and curb lines behind the statuary), with no smooth, uniform or reflective sheen hiding them, so the differences appear to come from lighting and objects rather than water."
+2026-10-16 13:04,2026-10-16/1304.jpg,5.44,5.54,2026-10-16 13:00,0.87,2026-10-16 15:21,5.93,no,haiku,"The path strip left of the large tree still shows the same fence posts, curb and ground features as in image 1, with no uniform reflective sheen hiding them."
+2026-10-16 13:24,2026-10-16/1324.jpg,5.56,5.66,2026-10-16 13:18,0.87,2026-10-16 15:21,5.93,no,haiku,"In image 2 the same ground features and surface texture visible in image 1 remain visible, with no smooth or reflective water sheen hiding them; the differences look like lighting, shadows, and moved objects."
+2026-10-16 13:36,2026-10-16/1336.jpg,5.63,5.73,2026-10-16 13:30,0.87,2026-10-16 15:21,5.93,no,haiku,"Image 2 shows the same ground features as image 1, including the posts, the white bench-like structure, and the shrub line, with no uniform reflective sheen covering the path; the differences look like lighting and haze."
+2026-10-16 13:49,2026-10-16/1349.jpg,5.69,5.80,2026-10-16 13:42,0.87,2026-10-16 15:21,5.93,no,haiku,"The ground features and garden structures visible in image 1 remain distinct in image 2, with no smooth, uniform, or reflective surface hiding them."
+2026-10-16 14:04,2026-10-16/1404.jpg,5.76,5.87,2026-10-16 14:00,0.87,2026-10-16 15:21,5.93,no,haiku,"In image 2 the ground strip beside the statuary yard still shows the same textured surfaces and edges as image 1, with no uniform reflective sheen hiding them; the visible differences are mainly lighting and parked vehicles."
+2026-10-16 14:21,2026-10-16/1421.jpg,5.83,5.94,2026-10-16 14:12,0.87,2026-10-16 15:21,5.93,no,haiku,"The ground strip in image 2 keeps the same textured concrete and path markings seen in image 1, with no smooth, uniform, or reflective sheen that would suggest standing water."
+2026-10-16 14:32,2026-10-16/1432.jpg,5.86,6.03,2026-10-16 14:24,0.87,2026-10-16 15:21,5.93,no,haiku,"The light-colored path edge and ground details visible in image 1 still appear in image 2, with no uniform reflective water surface covering that strip."
+2026-10-16 14:47,2026-10-16/1447.jpg,5.90,6.08,2026-10-16 14:42,0.87,2026-10-16 15:21,5.93,no,haiku,"The path area in image 2 shows no smooth, uniform, or reflective water surface and retains the ground features seen in image 1, though the low resolution limits certainty."
+2026-10-16 15:05,2026-10-16/1505.jpg,5.92,6.11,2026-10-16 15:00,0.88,2026-10-16 15:21,5.93,no,haiku,"The ground strip behind the statuary yard in image 2 keeps the same light horizontal band, vegetation edges, and gray texture seen in image 1, with no uniform reflective sheen covering those features."
+2026-10-16 15:23,2026-10-16/1523.jpg,5.93,6.12,2026-10-16 15:18,0.88,2026-10-16 15:21,5.93,no,haiku,"The ground features and texture visible in image 1 remain visible in image 2, with no smooth, reflective, or uniform water surface hiding them; the differences are mainly cars and shadows."
+2026-10-16 15:34,2026-10-16/1534.jpg,5.92,6.14,2026-10-16 15:24,0.88,2026-10-16 15:21,5.93,no,haiku,"The path in image 2 shows the same ground texture, edges, and tones as the dry path in image 1, with no smooth, reflective sheen hiding those features."
 2026-10-16 15:47,2026-10-16/1547.jpg,5.89,6.07,2026-10-16 15:42,0.88,2026-10-16 15:21,5.93,,,
 2026-10-16 16:04,2026-10-16/1604.jpg,5.83,6.01,2026-10-16 15:54,0.88,2026-10-16 15:21,5.93,,,
 2026-10-16 16:20,2026-10-16/1620.jpg,5.73,5.94,2026-10-16 16:12,0.88,2026-10-16 15:21,5.93,,,
