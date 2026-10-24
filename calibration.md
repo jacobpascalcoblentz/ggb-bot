@@ -1,11 +1,11 @@
 # Flood calibration
 
-**Status: collecting** — 1/3 tides with a fully observed flood (onset and clearing both bracketed by dry captures).
+**Status: collecting** — 2/3 tides with a fully observed flood (onset and clearing both bracketed by dry captures).
 
 | | bot.py now | fitted |
 |---|---|---|
 | `FLOOD_LEVEL_FT` | 5.9 | 4.68 (spread 0.78ft, n=4) |
-| `DRAIN_LAG` | 60 min | 38 min (spread 27 min, n=2) |
+| `DRAIN_LAG` | 60 min | 25 min (spread 41 min, n=3) |
 
 Ready when ≥3 tides are fully observed, onset levels agree within 0.4ft and drain lags within 45 min.
 
@@ -32,6 +32,6 @@ Ready when ≥3 tides are fully observed, onset levels agree within 0.4ft and dr
 | 2026-10-22 09:57 | 6.33 | 31 | yes | — | — | — | — |
 | 2026-10-22 21:53 | 5.96 | 5 | no | — | — | — | — |
 | 2026-10-23 10:22 | 6.59 | 27 | yes | — | — | — | — |
-| 2026-10-24 10:49 | 6.77 | 23 | yes | 1:13pm | 5.04 | — | — |
+| 2026-10-24 10:49 | 6.77 | 24 | yes | 1:13pm | 5.04 | 1:40pm | 11 min |
 
 Levels are modeled Sausalito ft MLLW (NOAA prediction + anomaly), the units bot.py uses. Haiku's `flooded` labels in log.csv can be corrected by hand; this report is rebuilt on every capture.
