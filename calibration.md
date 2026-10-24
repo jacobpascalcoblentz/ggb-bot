@@ -28,6 +28,7 @@ Ready when ≥3 tides are fully observed, onset levels agree within 0.4ft and dr
 | 2026-10-19 18:45 | 5.59 | 14 | yes | — | — | — | — |
 | 2026-10-20 09:07 | 5.68 | 25 | no | — | — | — | — |
 | 2026-10-20 19:54 | 5.66 | 11 | no | — | — | — | — |
-| 2026-10-21 09:33 | 5.99 | 8 | yes | — | — | — | — |
+| 2026-10-21 09:33 | 5.99 | 27 | yes | — | — | — | — |
+| 2026-10-22 09:57 | 6.33 | 21 | no | — | — | — | — |
 
 Levels are modeled Sausalito ft MLLW (NOAA prediction + anomaly), the units bot.py uses. Haiku's `flooded` labels in log.csv can be corrected by hand; this report is rebuilt on every capture.
