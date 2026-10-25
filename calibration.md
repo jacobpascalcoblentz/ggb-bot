@@ -4,8 +4,8 @@
 
 | | bot.py now | fitted |
 |---|---|---|
-| `FLOOD_LEVEL_FT` | 5.9 | 4.68 (spread 0.78ft, n=4) |
-| `DRAIN_LAG` | 60 min | 25 min (spread 41 min, n=3) |
+| `FLOOD_LEVEL_FT` | 5.9 | 4.78 (spread 2.67ft, n=5) |
+| `DRAIN_LAG` | 60 min | 29 min (spread 53 min, n=3) |
 
 Ready when ≥3 tides are fully observed, onset levels agree within 0.4ft and drain lags within 45 min.
 
@@ -13,7 +13,7 @@ Ready when ≥3 tides are fully observed, onset levels agree within 0.4ft and dr
 
 | peak | peak ft | captures | flooded | onset | onset level | clear | drain lag |
 |---|---|---|---|---|---|---|---|
-| 2026-10-13 13:24 | 6.59 | 28 | yes | — | — | 4:26pm | 25 min |
+| 2026-10-13 13:24 | 6.59 | 28 | yes | — | — | 4:26pm | 29 min |
 | 2026-10-14 03:29 | 5.12 | 10 | no | — | — | — | — |
 | 2026-10-14 13:56 | 6.28 | 35 | yes | — | — | — | — |
 | 2026-10-15 04:31 | 4.95 | 7 | yes | 7:57am | 4.26 | 8:34am | — |
@@ -24,7 +24,7 @@ Ready when ≥3 tides are fully observed, onset levels agree within 0.4ft and dr
 | 2026-10-17 16:20 | 5.71 | 22 | yes | — | — | — | — |
 | 2026-10-18 07:57 | 5.23 | 19 | yes | 12:11pm | 4.59 | — | — |
 | 2026-10-18 17:31 | 5.65 | 18 | yes | — | — | — | — |
-| 2026-10-19 08:37 | 5.42 | 21 | yes | 11:18am | 4.78 | 12:27pm | 52 min |
+| 2026-10-19 08:37 | 5.42 | 21 | yes | 11:18am | 4.78 | 12:27pm | 68 min |
 | 2026-10-19 18:45 | 5.59 | 14 | yes | — | — | — | — |
 | 2026-10-20 09:07 | 5.68 | 25 | no | — | — | — | — |
 | 2026-10-20 19:54 | 5.66 | 11 | no | — | — | — | — |
@@ -32,7 +32,7 @@ Ready when ≥3 tides are fully observed, onset levels agree within 0.4ft and dr
 | 2026-10-22 09:57 | 6.33 | 31 | yes | — | — | — | — |
 | 2026-10-22 21:53 | 5.96 | 5 | no | — | — | — | — |
 | 2026-10-23 10:22 | 6.59 | 27 | yes | — | — | — | — |
-| 2026-10-24 10:49 | 6.77 | 29 | yes | 1:13pm | 5.04 | 1:40pm | 11 min |
-| 2026-10-25 11:17 | 7.11 | 11 | yes | — | — | — | — |
+| 2026-10-24 10:49 | 6.77 | 29 | yes | 1:13pm | 5.04 | 1:40pm | 15 min |
+| 2026-10-25 11:17 | 7.11 | 12 | yes | 10:26am | 6.93 | — | — |
 
 Levels are modeled Sausalito ft MLLW (NOAA prediction + anomaly), the units bot.py uses. Haiku's `flooded` labels in log.csv can be corrected by hand; this report is rebuilt on every capture.
