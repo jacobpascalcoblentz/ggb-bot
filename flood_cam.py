@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """Capture Club Evexia Shoreline Hwy cam snapshots around big high tides.
 
-Builds a dataset for calibrating FLOOD_LEVEL_FT and DRAIN_LAG in bot.py:
-each snapshot is logged alongside the modeled Sausalito water level and the
-live observed level at the Golden Gate, so we can see what level the water
-was at when the path started flooding and when it was clear again.
+Builds a dataset for calibrating flood levels: each snapshot is logged
+alongside the modeled Sausalito water level and the live observed level at
+the Golden Gate, so we can see what level the water was at when flooding
+started and when it was clear again.
 
-Haiku labels each snapshot by comparing the path against a reference
-picture of it dry, taken automatically at a daylight low tide. Until that
-reference exists, labels are left blank and filled in once it does. Labels
-set by hand (label_source "rider") are never overwritten.
+Haiku labels whether Shoreline Hwy is flooded by comparing the road against
+a reference picture of it dry, taken automatically at a daylight low tide.
+Until that reference exists, labels are left blank and filled in once it
+does. Labels set by hand (label_source "reviewed") are never overwritten.
+The bike path is too small in the frame to judge, so its column
+(path_flooded) comes from rider reports only.
 
 --check uses only the standard library, so the workflow can run it on the
 bare runner (it runs every 15 minutes and usually exits right away).
-Capturing needs Pillow to crop the path out of the frame.
+Capturing needs Pillow to crop the road out of the frame.
 
 Usage:
   flood_cam.py --check     print "capture=true|false" (for $GITHUB_OUTPUT)
@@ -52,8 +54,12 @@ DRY_REF_LEVEL_FT = 2.5
 RELABEL_BATCH = 40
 FIELDS = [
     "captured_at", "image", "model_sausalito_ft", "observed_sf_ft",
-    "observed_sf_at", "anomaly_ft", "peak_at", "peak_ft", "flooded",
-    "label_source", "notes",
+    "observed_sf_at", "anomaly_ft", "peak_at", "peak_ft",
+    # Shoreline Hwy, labeled by Haiku (label_source "haiku") or by a person
+    # ("reviewed"), whose labels are never overwritten
+    "flooded", "label_source", "notes",
+    # The bike path, from rider reports only: the cam can't resolve it
+    "path_flooded",
 ]
 # The cam is too dark to judge flooding near or after sunset (a fixed
 # 6am-7pm window let a dusk shot with lamp glare become the dry reference).
@@ -64,12 +70,13 @@ MIN_SUN_ELEVATION_REF = 15  # the reference needs good light
 
 NOAA = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"
 VISION_MODEL = "claude-haiku-5-5"
-# Where the Mill Valley-Sausalito path shows in the 1280x720 frame: the strip
-# behind the garden statuary yard along Shoreline Hwy, left of the big tree
-# (cells D4:G4 of a 16x9 grid). It's too small for Haiku to judge in the full
-# frame, so we also send an enlarged crop.
-PATH_BOX = (240, 240, 560, 320)
-CROP_SCALE = 3
+# Shoreline Hwy across the frame (1280x720), from the garden statuary yard
+# to past the stop sign. The bike path itself is only a few pixels tall here
+# and Haiku couldn't tell it wet from dry, but the road visibly floods into
+# a sheet of water, so we label the road and calibrate the path from rider
+# reports. Haiku gets an enlarged crop alongside the full frame.
+ROAD_BOX = (180, 225, 1200, 315)
+CROP_SCALE = 2
 
 
 def get_json(url):
@@ -171,12 +178,12 @@ def observed_now():
         return None, None
 
 
-def path_crop_b64(image_path):
-    """The path area of a snapshot, enlarged, as base64 JPEG."""
+def road_crop_b64(image_path):
+    """The Shoreline Hwy strip of a snapshot, enlarged, as base64 JPEG."""
     from PIL import Image  # only needed when capturing, not for --check
 
     with Image.open(image_path) as im:
-        crop = im.crop(PATH_BOX)
+        crop = im.crop(ROAD_BOX)
         crop = crop.resize((crop.width * CROP_SCALE, crop.height * CROP_SCALE), Image.LANCZOS)
         buf = io.BytesIO()
         crop.convert("RGB").save(buf, "JPEG", quality=92)
@@ -188,9 +195,9 @@ def jpeg_block(b64):
 
 
 def classify_flooding(image_path, reference):
-    """Ask Haiku whether the path in the snapshot is flooded.
+    """Ask Haiku whether Shoreline Hwy in the snapshot is flooded.
 
-    `reference` is (image_path, level_ft) of the path known dry. Returns
+    `reference` is (image_path, level_ft) of the road known dry. Returns
     (flooded, notes): flooded is "yes", "no" or "" if the call failed or
     ANTHROPIC_API_KEY isn't set.
     """
@@ -203,26 +210,31 @@ def classify_flooding(image_path, reference):
     prompt = (
         "These are from a webcam at Club Evexia, 100 Shoreline Hwy, Mill Valley, "
         "CA, looking across Shoreline Hwy toward US-101 beside Richardson Bay. "
-        "Images 1 and 2 are enlarged crops of the same spot: the strip behind "
-        "the garden statuary yard along Shoreline Hwy, left of a large tree, "
-        "where the Mill Valley-Sausalito bike path runs.\n"
-        f"- Image 1: the path known DRY, at low tide ({ref_level:.1f}ft).\n"
-        "- Image 2: the same spot now.\n"
+        "Images 1 and 2 are enlarged crops of the same strip of Shoreline Hwy.\n"
+        f"- Image 1: the road known DRY, at low tide ({ref_level:.1f}ft).\n"
+        "- Image 2: the same strip now.\n"
         "- Image 3: the full frame now, for context.\n\n"
-        "At high tide bay water floods the path. Compare image 2 against image "
-        "1: water hides ground features visible in image 1 under a smooth, "
-        "uniform or reflective surface. Ignore differences from lighting, "
-        "shadows, people, cars and garden items being moved. Is the path in "
-        "image 2 flooded?\n\n"
+        "At very high tides bay water floods Shoreline Hwy: a sheet of standing "
+        "water covers the lanes, with cars throwing spray as they drive through. "
+        "Calm floodwater is easy to mistake for dark, smooth pavement; the "
+        "giveaways are upside-down reflections of the US-101 viaduct, trees, "
+        "poles and cars in the road surface, and lane markings that are visible "
+        "in image 1 but missing in image 2. Is there standing water covering "
+        "any of the travel lanes in image 2? After the water drains, wet "
+        "pavement in afternoon sun shows a bright, featureless white or silver "
+        "glare: that is NOT flooding. Count it as flooded only if the road "
+        "mirrors recognizable shapes (the viaduct, trees, poles, cars) or cars "
+        "are throwing spray. Puddles at the edges don't count. Ignore the "
+        "parking lot in the foreground.\n\n"
         'Respond with JSON only: {"flooded": true|false, "notes": "<one short '
-        'sentence on how the path in image 2 differs from image 1>"}'
+        'sentence on what the road surface looks like>"}'
     )
     body = json.dumps({
         "model": VISION_MODEL,
         "max_tokens": 2000,
         "messages": [{"role": "user", "content": [
-            jpeg_block(path_crop_b64(ref_path)),
-            jpeg_block(path_crop_b64(image_path)),
+            jpeg_block(road_crop_b64(ref_path)),
+            jpeg_block(road_crop_b64(image_path)),
             jpeg_block(full_b64),
             {"type": "text", "text": prompt},
         ]}],

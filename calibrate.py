@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Fit bot.py's FLOOD_LEVEL_FT and DRAIN_LAG from flood cam captures.
+"""Fit flood levels from flood cam captures and rider reports.
 
 Reads OUT_DIR/log.csv (written by flood_cam.py), finds when each high tide
-started flooding the road and when it was clear again, and writes
-OUT_DIR/calibration.md. Prints "ready=true|false" (for $GITHUB_OUTPUT): ready
+started flooding Shoreline Hwy and when it was clear again, and writes
+OUT_DIR/calibration.md, along with what rider reports say about the bike
+path (which floods lower than the road, and which the cam can't resolve). Prints "ready=true|false" (for $GITHUB_OUTPUT): ready
 once enough tides bracket both the onset and the clearing and agree with
 each other.
 
@@ -89,6 +90,16 @@ def analyze(caps):
     return result
 
 
+def path_bounds(log_path):
+    """Modeled levels from rider path reports: (lowest seen flooded, highest seen dry, n)."""
+    wet, dry = [], []
+    with open(log_path, newline="") as f:
+        for row in csv.DictReader(f):
+            if row.get("path_flooded") in ("yes", "no") and row["model_sausalito_ft"]:
+                (wet if row["path_flooded"] == "yes" else dry).append(float(row["model_sausalito_ft"]))
+    return (min(wet) if wet else None), (max(dry) if dry else None), len(wet) + len(dry)
+
+
 def fmt(t):
     return t.strftime("%-I:%M%p").lower() if t else "—"
 
@@ -129,17 +140,17 @@ def main():
         return f"{td.total_seconds() / 60:.0f} min" if td is not None else "—"
 
     lines = [
-        "# Flood calibration",
+        "# Shoreline Hwy flood calibration",
         "",
         f"**Status: {'ready ✅' if ready else 'collecting'}** — {len(complete)}/{MIN_EVENTS} tides "
         f"with a fully observed flood (onset and clearing both bracketed by dry captures).",
         "",
-        "| | bot.py now | fitted |",
-        "|---|---|---|",
-        f"| `FLOOD_LEVEL_FT` | {cur_level:.1f} | "
-        f"{f'{fit_level:.2f}' if fit_level is not None else '—'} "
+        "| | road fit |",
+        "|---|---|",
+        f"| flood level | "
+        f"{f'{fit_level:.2f}ft' if fit_level is not None else '—'} "
         f"{f'(spread {max(onset_levels) - min(onset_levels):.2f}ft, n={len(onset_levels)})' if onset_levels else ''} |",
-        f"| `DRAIN_LAG` | {lag_min(cur_lag)} | {lag_min(fit_lag)} "
+        f"| drain lag | {lag_min(fit_lag)} "
         f"{f'(spread {lag_min(max(lags) - min(lags))}, n={len(lags)})' if lags else ''} |",
         "",
         f"Ready when ≥{MIN_EVENTS} tides are fully observed, onset levels agree within "
@@ -156,10 +167,23 @@ def main():
             f"| {peak} | {r['peak_ft']:.2f} | {r['captures']} | {'yes' if r['flooded'] else 'no'} | "
             f"{fmt(r['onset_t'])} | {onset_level} | {fmt(r['clear_t'])} | {lag_min(r.get('lag'))} |"
         )
+    path_wet, path_dry, path_n = path_bounds(log)
+    lines += [
+        "",
+        "## Bike path (rider reports)",
+        "",
+        f"bot.py assumes the path floods at {cur_level:.1f}ft and takes "
+        f"{lag_min(cur_lag)} to drain.",
+        "",
+        f"- Lowest level seen flooded: {f'{path_wet:.2f}ft' if path_wet is not None else '—'}",
+        f"- Highest level seen dry: {f'{path_dry:.2f}ft' if path_dry is not None else '—'}",
+        f"- Reports: {path_n} captures labeled",
+    ]
     lines += [
         "",
         "Levels are modeled Sausalito ft MLLW (NOAA prediction + anomaly), the units bot.py uses. "
-        "Haiku's `flooded` labels in log.csv can be corrected by hand; this report is rebuilt on every capture.",
+        "Haiku's road labels (`flooded`) can be corrected by hand (set `label_source` to `reviewed`); "
+        "path reports go in `path_flooded`. This report is rebuilt on every capture.",
         "",
     ]
     with open(os.path.join(out_dir, "calibration.md"), "w") as f:

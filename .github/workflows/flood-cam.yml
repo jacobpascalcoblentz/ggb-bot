@@ -71,13 +71,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          title="Flood calibration ready"
+          title="Shoreline Hwy flood calibration ready"
           existing=$(gh issue list --state all --search "\"$title\" in:title" --json number -q 'length')
           if [ "$existing" -eq 0 ]; then
             {
-              echo "Enough tides have been captured to calibrate the flood window."
-              echo "Update FLOOD_LEVEL_FT and DRAIN_LAG in bot.py from the fit below,"
-              echo "then disable the Flood cam capture workflow."
+              echo "Enough tides have been captured to fit when Shoreline Hwy floods."
+              echo "Use it alongside the rider path reports below to set the flood"
+              echo "levels in bot.py, then disable the Flood cam capture workflow."
               echo
               echo "Report: ${{ github.server_url }}/${{ github.repository }}/blob/flood-cam/calibration.md"
               echo
