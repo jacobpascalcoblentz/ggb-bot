@@ -6,7 +6,8 @@ started flooding Shoreline Hwy and when it was clear again, and writes
 OUT_DIR/calibration.md, along with what rider reports say about the bike
 path (which floods lower than the road, and which the cam can't resolve). Prints "ready=true|false" (for $GITHUB_OUTPUT): ready
 once enough tides bracket both the onset and the clearing and agree with
-each other.
+each other. Also fits a basin model (see SILL_FT) to the same captures and
+compares the two, which needs the NOAA predictions for the logged days.
 
 Levels are in the same units bot.py works in: the modeled Sausalito level
 (NOAA prediction + anomaly), not the observed Golden Gate level, so the fit
@@ -16,17 +17,29 @@ Standard library only, like flood_cam.py.
 """
 
 import csv
+import math
 import os
 import re
 import statistics
 import sys
 from datetime import datetime, timedelta
 
+from flood_cam import NOAA, TIDE_STATION, get_json, level_at
+
 # How many tides with a fully bracketed flood we want, and how tightly they
 # must agree, before calling the calibration good.
 MIN_EVENTS = 3
 MAX_LEVEL_SPREAD_FT = 0.4
 MAX_LAG_SPREAD = timedelta(minutes=45)
+
+# Basin model: the road floods from a low area that fills from the bay over a
+# sill and drains back through it, flow going as the square root of the head
+# difference (orifice flow). The cam data can't pin the sill down, so it comes
+# from lidar instead: the low point of Shoreline Hwy by the cam in the USGS 3DEP
+# 1m DEM (2018), 5.62ft NAVD88, which is 5.45ft MLLW at Sausalito.
+SILL_FT = 5.45
+STEP = timedelta(minutes=2)
+K_GRID = [0.002, 0.003, 0.004, 0.005, 0.006, 0.008, 0.01, 0.015, 0.02, 0.03, 0.04]
 
 
 def current_constants():
@@ -75,7 +88,8 @@ def analyze(caps):
     flags = [c["flooded"] for c in caps]
     runs = [i for i in range(len(caps) - 1) if flags[i] and flags[i + 1]]
     result = {"peak_ft": caps[0]["peak_ft"], "captures": len(caps),
-              "flooded": any(flags), "onset_level": None, "onset_t": None, "clear_t": None}
+              "flooded": any(flags), "onset_level": None, "onset_t": None, "clear_t": None,
+              "all_caps": caps}
     if not runs:
         return result
     first, last = runs[0], runs[-1] + 1
@@ -90,6 +104,84 @@ def analyze(caps):
     return result
 
 
+def tide_series(log_path):
+    """Modeled Sausalito level every STEP over the logged days, as bot.py models it.
+
+    Uses each day's logged anomaly. Returns (start time, levels).
+    """
+    anomalies = {}
+    with open(log_path, newline="") as f:
+        for row in csv.DictReader(f):
+            if row["anomaly_ft"]:
+                anomalies.setdefault(row["captured_at"][:10], []).append(float(row["anomaly_ft"]))
+    days = sorted(anomalies)
+    begin = datetime.strptime(days[0], "%Y-%m-%d") - timedelta(days=1)
+    end = datetime.strptime(days[-1], "%Y-%m-%d") + timedelta(days=2)
+    data = get_json(
+        f"{NOAA}?begin_date={begin:%Y%m%d}&end_date={end:%Y%m%d}&interval=hilo"
+        f"&station={TIDE_STATION}&product=predictions"
+        "&datum=MLLW&time_zone=lst_ldt&units=english&format=json"
+    )
+    extremes = []
+    for p in data.get("predictions", []):
+        t = datetime.strptime(p["t"], "%Y-%m-%d %H:%M")
+        nearest = min(days, key=lambda d: abs((datetime.strptime(d, "%Y-%m-%d") - t.replace(hour=0, minute=0)).days))
+        day_anomaly = anomalies[nearest]
+        extremes.append((t, float(p["v"]) + max(0.0, statistics.mean(day_anomaly)), p["type"]))
+    start = extremes[0][0]
+    levels, t = [], start
+    while t <= extremes[-1][0]:
+        levels.append(level_at(extremes, t))
+        t += STEP
+    return start, levels
+
+
+def basin_levels(bay, k_in, k_out):
+    """Water level in the basin behind the sill, for each bay level (ft per STEP)."""
+    h, out = SILL_FT, []
+    for b in bay:
+        if b > h and b > SILL_FT:
+            h = min(b, h + k_in * math.sqrt(b - max(h, SILL_FT)))
+        elif h > SILL_FT and h > b:
+            h = max(b, SILL_FT, h - k_out * math.sqrt(h - max(b, SILL_FT)))
+        out.append(h)
+    return out
+
+
+def threshold_flags(bay, level, lag):
+    """bot.py's model: flooded while above `level`, and for `lag` after."""
+    last, out, n = None, [], lag / STEP
+    for i, b in enumerate(bay):
+        if b >= level:
+            last = i
+        out.append(last is not None and i - last <= n)
+    return out
+
+
+def fit_basin(bay, labels):
+    """Grid-fit inflow and outflow rates and the level the road floods at.
+
+    `labels` is [(series index, flooded)]. Returns (errors, k_in, k_out, z, flags).
+    """
+    best = None
+    for k_in in K_GRID:
+        for k_out in K_GRID:
+            h = basin_levels(bay, k_in, k_out)
+            for z in [x / 20 for x in range(110, 160)]:
+                errors = sum((h[i] >= z) != y for i, y in labels)
+                if best is None or errors < best[0]:
+                    best = (errors, k_in, k_out, z, [x >= z for x in h])
+    return best
+
+
+def flags_window(flags, start, caps):
+    """First and last flagged time within a tide's capture span (± an hour)."""
+    lo = int((caps[0]["t"] - start - timedelta(hours=1)) / STEP)
+    hi = int((caps[-1]["t"] - start + timedelta(hours=1)) / STEP)
+    on = [i for i in range(max(lo, 0), min(hi, len(flags))) if flags[i]]
+    return (start + on[0] * STEP, start + on[-1] * STEP) if on else None
+
+
 def path_bounds(log_path):
     """Modeled levels from rider path reports: (lowest seen flooded, highest seen dry, n)."""
     wet, dry = [], []
@@ -98,6 +190,55 @@ def path_bounds(log_path):
             if row.get("path_flooded") in ("yes", "no") and row["model_sausalito_ft"]:
                 (wet if row["path_flooded"] == "yes" else dry).append(float(row["model_sausalito_ft"]))
     return (min(wet) if wet else None), (max(dry) if dry else None), len(wet) + len(dry)
+
+
+def basin_report(log, results, fit_level, fit_lag):
+    """Report lines comparing the basin model with the threshold + lag fit."""
+    try:
+        start, bay = tide_series(log)
+    except Exception as e:
+        print(f"Tide series fetch failed: {e}", file=sys.stderr)
+        return []
+    labels = [(int((c["t"] - start) / STEP), c["flooded"])
+              for r in results.values() for c in r["all_caps"]]
+    errors, k_in, k_out, z, flags = fit_basin(bay, labels)
+    lines = [
+        "",
+        "## Basin model",
+        "",
+        f"The road floods from a basin that fills from the bay over a sill at {SILL_FT}ft "
+        "(lidar) and drains back through it. Fit: water shows on the road at "
+        f"{z:.2f}ft in the basin, inflow {k_in}, outflow {k_out} (ft per 2 min per √ft).",
+        "",
+        f"Captures the basin model gets wrong: {errors}/{len(labels)}",
+    ]
+    if fit_level is not None and fit_lag is not None:
+        thr = threshold_flags(bay, fit_level, fit_lag)
+        thr_errors = sum(thr[i] != y for i, y in labels)
+        lines.append(f"Captures the road fit above ({fit_level:.2f}ft + {lag_str(fit_lag)}) gets wrong: "
+                     f"{thr_errors}/{len(labels)}")
+    else:
+        thr = None
+    lines += ["", "| peak | observed | basin | road fit |", "|---|---|---|---|"]
+    for peak, r in results.items():
+        if not r["flooded"] and r["peak_ft"] < SILL_FT + 1:
+            continue
+        caps = r["all_caps"]
+        wet = [c["t"] for c in caps if c["flooded"]]
+
+        def span(w):
+            return f"{fmt(w[0])}–{fmt(w[1])}" if w else "dry"
+
+        lines.append(
+            f"| {peak} | {span((wet[0], wet[-1]) if wet else None)} | "
+            f"{span(flags_window(flags, start, caps))} | "
+            f"{span(flags_window(thr, start, caps)) if thr else '—'} |"
+        )
+    return lines
+
+
+def lag_str(td):
+    return f"{td.total_seconds() / 60:.0f} min"
 
 
 def fmt(t):
@@ -167,6 +308,7 @@ def main():
             f"| {peak} | {r['peak_ft']:.2f} | {r['captures']} | {'yes' if r['flooded'] else 'no'} | "
             f"{fmt(r['onset_t'])} | {onset_level} | {fmt(r['clear_t'])} | {lag_min(r.get('lag'))} |"
         )
+    lines += basin_report(log, results, fit_level, fit_lag)
     path_wet, path_dry, path_n = path_bounds(log)
     lines += [
         "",
