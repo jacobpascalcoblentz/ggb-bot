@@ -38,6 +38,10 @@ MAX_LAG_SPREAD = timedelta(minutes=45)
 # from lidar instead: the low point of Shoreline Hwy by the cam in the USGS 3DEP
 # 1m DEM (2018), 5.62ft NAVD88, which is 5.45ft MLLW at Sausalito.
 SILL_FT = 5.45
+# Low point of the bike path in the same DEM, where it meets Shoreline Hwy by
+# Manzanita, and riders' rule of thumb for when it starts flooding.
+PATH_LIDAR_FT = 5.9
+PATH_RULE_OF_THUMB_FT = 6.0
 STEP = timedelta(minutes=2)
 K_GRID = [0.002, 0.003, 0.004, 0.005, 0.006, 0.008, 0.01, 0.015, 0.02, 0.03, 0.04]
 
@@ -317,6 +321,7 @@ def main():
         f"bot.py assumes the path floods at {cur_level:.1f}ft and takes "
         f"{lag_min(cur_lag)} to drain.",
         "",
+        f"- Lidar low point: {PATH_LIDAR_FT:.1f}ft; riders' rule of thumb: floods from {PATH_RULE_OF_THUMB_FT:.1f}ft",
         f"- Lowest level seen flooded: {f'{path_wet:.2f}ft' if path_wet is not None else '—'}",
         f"- Highest level seen dry: {f'{path_dry:.2f}ft' if path_dry is not None else '—'}",
         f"- Reports: {path_n} captures labeled",
